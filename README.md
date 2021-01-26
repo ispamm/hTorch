@@ -2,9 +2,15 @@
 
 This repository contains code inspired by many papers on quaternion neural networks. Here you will
 find the code for quaternion batch normalization among the classical layers.<br>
-Differently from other repos, every weight parameter is its own, thus every single real
-or imaginary part is *not* considered a parameter.
+Differently from other repos, every weight parameter is its own, thus every single real or imaginary part is *not* considered a parameter. <br>
+The code also contains a function to turn real-valued NN's into quaternion ones.
 
+#TODO:
+- add example
+- quaternion backprop
+- fix bn
+- qselu (?)
+- speed up code
 
 ## References
 <a id="1">[1]</a> 
