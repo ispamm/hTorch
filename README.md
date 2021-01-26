@@ -19,7 +19,7 @@ Deep Complex Networks.
 [link](https://arxiv.org/abs/1705.09792)
 
 <a id="3">[3]</a> 
-Titouan Parcollet,Mohamed Morchid, G. Linarès (2019).
+Titouan Parcollet, Mohamed Morchid, G. Linarès (2019).
 A survey of quaternion neural networks.
 Artificial Intelligence Review.
 [link](https://link.springer.com/article/10.1007/s10462-019-09752-1)
