@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import re
 import sys
 from functions import *
-
+from utils import to_hermitian, apply_quaternion_gradient
 
 def convert_to_quaternion(Net: nn.Module, spinor=False):
     """
@@ -60,5 +60,5 @@ def convert_to_quaternion(Net: nn.Module, spinor=False):
             if getattr(Net, name).bias != None:
                 getattr(Net, name).bias.data.zero_()
     
-    return Net
+    return apply_quaternion_gradient(Net)
                 
