@@ -45,6 +45,6 @@ def apply_quaternion_gradient(model):
     for name, parameter in model.named_parameters():
         if name in ["Linear","Conv1d", "Conv2d","Conv3d",
                     "ConvTranspose1d", "ConvTranspose2d", "ConvTranspose3d"]:        
-            parameter.register_hook(lambda grad: to_hermitian(grad))
+            parameter.register_hook(lambda grad: 4*to_hermitian(grad))
     
     return model
