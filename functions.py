@@ -45,7 +45,7 @@ from copy import deepcopy
 Q = Quaternion
 
 
-def initialize_linear(in_channels, out_channels):
+def initialize_linear(in_channels, out_channels, init_mode="xavier"):
     """
     Quaternion initialization
     It can be shown [7] that the variance for the magnitude is given
@@ -54,14 +54,19 @@ def initialize_linear(in_channels, out_channels):
     The basis vectors are randomly initialized and normalized based on their norm.
     The whole initialization is performed considering the polar form of the quaternion
 
-    :type in_channels: int
-    :type out_channels: int
+    @type in_channels: int
+    @type out_channels: int
+    @type init_mode: str
     """
+
+    if init_mode == "he":
+        scale = 1 / np.sqrt(in_channels * 2)
+    elif init_mode in ["xavier","glorot"]:
+        scale = 1 / np.sqrt((in_channels + out_channels) * 2)
+        
     in_channels //= 4
     out_channels //= 4
-
-    # LeCun criterion
-    scale = 1 / np.sqrt(in_channels * 2)
+        
     size_real = [in_channels, out_channels]
     size_img = [in_channels, out_channels * 3]
 
@@ -80,7 +85,7 @@ def initialize_linear(in_channels, out_channels):
     return mat
 
 
-def initialize_conv(in_channels, out_channels, kernel_size=[2, 2]):
+def initialize_conv(in_channels, out_channels, kernel_size=[2, 2], init_mode="xavier"):
     """
     Quaternion initialization
     It can be shown [7] that the variance for the magnitude is given
@@ -89,10 +94,17 @@ def initialize_conv(in_channels, out_channels, kernel_size=[2, 2]):
     The basis vectors are randomly initialized and normalized based on their norm.
     The whole initialization is performed considering the polar form of the quaternion
 
-    :type in_channels: int
-    :type out_channels: int
-    :type kernel_size: int/list/tuple
+    @type in_channels: int
+    @type out_channels: int
+    @type kernel_size: int/list/tuple
+    @type init_mode: str
     """
+    prod = np.prod(kernel_size)
+    if init_mode == "he":
+        scale = 1 / np.sqrt(in_channels * prod * 2)
+    elif init_mode in ["xavier","glorot"]:
+        scale = 1 / np.sqrt((in_channels + out_channels) * prod * 2)
+        
     in_channels //= 4
     out_channels //= 4
 
@@ -104,10 +116,7 @@ def initialize_conv(in_channels, out_channels, kernel_size=[2, 2]):
         window = kernel_size
 
     prod = window[0] * window[1]
-    features_in, features_out = in_channels * prod, out_channels * prod
 
-    # LeCun criterion
-    scale = 1 / np.sqrt(features_in * 2)
     size = [in_channels, out_channels] + window
     size_img = [size[0]] + [size[1] * 3] + size[2:]
 
@@ -150,6 +159,8 @@ def get_real_matrix(r, i, j, k):
     Quaternion weight matrix.
     Quaternion weights can be seen as a real matrix obtained
     by the Hamilton product
+    
+    @type r, i, j, k: torch.Tensor
     """
 
     weights = torch.cat([torch.cat([r, -i, -j, -k], dim=0),
@@ -164,6 +175,8 @@ def get_rot_matrix(r, i, j, k):
     Quaternion rotation matrix.
     Quaternion rotation can be written as Rq where R is the rotation matrix:
     https://en.wikipedia.org/wiki/Quaternions_and_spatial_rotation
+    
+    @type r, i, j, k: torch.Tensor
     """
 
     row1 = torch.cat([torch.zeros_like(i)] * 4, 0)
