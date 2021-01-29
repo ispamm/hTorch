@@ -467,7 +467,7 @@ class QConvTranspose2d(nn.Module):
 
 class QConvTranspose3d(nn.Module):
     """
-    Quaternion transpose convolution 2d
+    Quaternion transpose convolution 3d
     """
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
@@ -529,14 +529,14 @@ class QMaxPool2d(nn.Module):
     Quaternion max pooling 2d
     """
 
-    def __init__(self, window, stride, padding=0):
+    def __init__(self, kernel_size, stride, padding=0):
         """
-        @type window: int/tuple/list
+        @type kernel_size: int/tuple/list
         @type stride: int/tuple/list
         @type padding: int
         """
         super(QMaxPool2d, self).__init__()
-        self.pool = nn.MaxPool2d(window, stride, padding, return_indices=True)
+        self.pool = nn.MaxPool2d(kernel_size, stride, padding, return_indices=True)
 
     def forward(self, x):
         x = Q(x)
