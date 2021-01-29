@@ -14,7 +14,7 @@ class QConv1d(nn.Module):
     """
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, out_padding=0, groups=1, dilation=1, seed=0, spinor=False):
+                 padding=0, out_padding=0, groups=1, bias=True, dilation=1, spinor=False):
         """
         @type in_channels: int
         @type out_channels: int
@@ -23,8 +23,8 @@ class QConv1d(nn.Module):
         @type padding: int
         @type out_padding: int
         @type groups: int
+        @type bias: bool
         @type dilation: int
-        @type seed: int
         @type spinor: bool
         """
         super(QConv1d, self).__init__()
@@ -40,8 +40,8 @@ class QConv1d(nn.Module):
         self.padding = padding
         self.out_padding = out_padding
         self.groups = groups
+        self.bias = bias
         self.dilation = dilation
-        self.seed = seed
         self.spinor = spinor
 
         self.reset_parameters()
@@ -55,15 +55,17 @@ class QConv1d(nn.Module):
             self.weight = nn.Parameter(get_rot_matrix(r, i, j, k)).permute(1,0,2,3)
         else:
             self.weight = nn.Parameter(get_real_matrix(r, i, j, k)).permute(1,0,2,3)
-
-        bias = torch.Tensor(self.out_channels)
-        bias.data.zero_()
-        self.bias = nn.Parameter(bias)
+        
+        if self.bias:
+            bias = torch.zeros(self.out_channels)
+            self.bias = nn.Parameter(bias)
+        else:
+            self.bias = None
 
     def forward(self, x):
 
-        return F.conv1d(x, self.weight, self.bias, self.stride,
-                        self.padding, self.out_padding, self.groups, self.dilation)
+        return F.conv1d(x, self.weight, self.bias, self.stride, self.padding,
+                        self.out_padding, self.groups, self.bias, self.dilation)
 
 
 class QConv2d(nn.Module):
@@ -72,7 +74,7 @@ class QConv2d(nn.Module):
     """
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, out_padding=0, groups=1, dilation=1, seed=0, spinor=False):
+                 padding=0, out_padding=0, groups=1, bias=True, dilation=1, spinor=False):
         """
         @type in_channels: int
         @type out_channels: int
@@ -81,8 +83,8 @@ class QConv2d(nn.Module):
         @type padding: int
         @type out_padding: int
         @type groups: int
+        @type bias: bool
         @type dilation: int
-        @type seed: int
         @type spinor: bool
         """
         super(QConv2d, self).__init__()
@@ -98,8 +100,8 @@ class QConv2d(nn.Module):
         self.padding = padding
         self.out_padding = out_padding
         self.groups = groups
+        self.bias = bias
         self.dilation = dilation
-        self.seed = seed
         self.spinor = spinor
 
         self.reset_parameters()
@@ -114,14 +116,16 @@ class QConv2d(nn.Module):
         else:
             self.weight = nn.Parameter(get_real_matrix(r, i, j, k)).permute(1,0,2,3)
 
-        bias = torch.Tensor(self.out_channels)
-        bias.data.zero_()
-        self.bias = nn.Parameter(bias)
+        if self.bias:
+            bias = torch.zeros(self.out_channels)
+            self.bias = nn.Parameter(bias)
+        else:
+            self.bias = None
 
     def forward(self, x):
 
-        return F.conv2d(x, self.weight, self.bias, self.stride,
-                        self.padding, self.out_padding, self.groups, self.dilation)
+        return F.conv2d(x, self.weight, self.bias, self.stride, self.padding,
+                        self.out_padding, self.groups, self.bias, self.dilation)
 
 
 class QConv3d(nn.Module):
@@ -130,7 +134,7 @@ class QConv3d(nn.Module):
     """
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, out_padding=0, groups=1, dilation=1, seed=0, spinor=False):
+                 padding=0, out_padding=0, groups=1, bias=True, dilation=1, spinor=False):
         """
         @type in_channels: int
         @type out_channels: int
@@ -139,8 +143,8 @@ class QConv3d(nn.Module):
         @type padding: int
         @type out_padding: int
         @type groups: int
+        @type bias: bool
         @type dilation: int
-        @type seed: int
         @type spinor: bool
         """
         super(QConv3d, self).__init__()
@@ -156,8 +160,8 @@ class QConv3d(nn.Module):
         self.padding = padding
         self.out_padding = out_padding
         self.groups = groups
+        self.bias = bias
         self.dilation = dilation
-        self.seed = seed
         self.spinor = spinor
 
         self.reset_parameters()
@@ -172,14 +176,16 @@ class QConv3d(nn.Module):
         else:
             self.weight = nn.Parameter(get_real_matrix(r, i, j, k)).permute(1,0,2,3)
 
-        bias = torch.Tensor(self.out_channels)
-        bias.data.zero_()
-        self.bias = nn.Parameter(bias)
+        if self.bias:
+            bias = torch.zeros(self.out_channels)
+            self.bias = nn.Parameter(bias)
+        else:
+            self.bias = None
 
     def forward(self, x):
 
-        return F.conv3d(x, self.weight, self.bias, self.stride,
-                        self.padding, self.out_padding, self.groups, self.dilation)
+        return F.conv3d(x, self.weight, self.bias, self.stride, self.padding,
+                        self.out_padding, self.groups, self.bias, self.dilation)
 
 
 class QLinear(nn.Module):
@@ -187,7 +193,7 @@ class QLinear(nn.Module):
     Quaternion linear
     """
 
-    def __init__(self, in_channels, out_channels, seed=0, spinor=False):
+    def __init__(self, in_channels, out_channels, bias=bool, spinor=False):
         super(QLinear, self).__init__()
 
         assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
@@ -196,13 +202,13 @@ class QLinear(nn.Module):
         assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
         self.out_channels = out_channels
 
-        self.seed = seed
+        self.bias = bias
         self.spinor = spinor
 
         self.reset_parameters()
 
     def reset_parameters(self):
-        mat = initialize_linear(self.in_channels, self.out_channels, seed=self.seed)
+        mat = initialize_linear(self.in_channels, self.out_channels)
         r, i, j, k = mat.chunk()
 
         if self.spinor:
@@ -210,9 +216,11 @@ class QLinear(nn.Module):
         else:
             self.weight = nn.Parameter(get_real_matrix(r, i, j, k)).permute(1, 0)
 
-        bias = torch.Tensor(self.out_channels)
-        bias.data.zero_()
-        self.bias = nn.Parameter(bias)
+        if self.bias:
+            bias = torch.zeros(self.out_channels)
+            self.bias = nn.Parameter(bias)
+        else:
+            self.bias = None
 
     def forward(self, x):
 
@@ -342,7 +350,7 @@ class QConvTranspose1d(nn.Module):
     """
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, out_padding=0, groups=1, dilation=1, seed=0, spinor=False):
+                 padding=0, out_padding=0, groups=1, bias=True, dilation=1, spinor=False):
         """
         @type in_channels: int
         @type out_channels: int
@@ -351,8 +359,8 @@ class QConvTranspose1d(nn.Module):
         @type padding: int
         @type out_padding: int
         @type groups: int
+        @type bias: bool
         @type dilation: int
-        @type seed: int
         @type spinor: bool
         """
         super(QConvTranspose1d, self).__init__()
@@ -368,8 +376,8 @@ class QConvTranspose1d(nn.Module):
         self.padding = padding
         self.out_padding = out_padding
         self.groups = groups
+        self.bias = bias
         self.dilation = dilation
-        self.seed = seed
         self.spinor = spinor
 
         self.reset_parameters()
@@ -384,9 +392,11 @@ class QConvTranspose1d(nn.Module):
         else:
             self.weight = nn.Parameter(get_real_matrix(r, i, j, k))
 
-        bias = torch.Tensor(self.out_channels)
-        bias.data.zero_()
-        self.bias = nn.Parameter(bias)
+        if self.bias:
+            bias = torch.zeros(self.out_channels)
+            self.bias = nn.Parameter(bias)
+        else:
+            self.bias = None
 
     def forward(self, x):
 
@@ -402,7 +412,7 @@ class QConvTranspose2d(nn.Module):
     """
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, out_padding=0, groups=1, dilation=1, seed=0, spinor=False):
+                 padding=0, out_padding=0, groups=1, dilation=1, spinor=False):
         """
         @type in_channels: int
         @type out_channels: int
@@ -411,8 +421,8 @@ class QConvTranspose2d(nn.Module):
         @type padding: int
         @type out_padding: int
         @type groups: int
+        @type bias: bool
         @type dilation: int
-        @type seed: int
         @type spinor: bool
         """
         super(QConvTranspose2d, self).__init__()
@@ -429,7 +439,6 @@ class QConvTranspose2d(nn.Module):
         self.out_padding = out_padding
         self.groups = groups
         self.dilation = dilation
-        self.seed = seed
         self.spinor = spinor
 
         self.reset_parameters()
@@ -444,9 +453,11 @@ class QConvTranspose2d(nn.Module):
         else:
             self.weight = nn.Parameter(get_real_matrix(r, i, j, k))
 
-        bias = torch.Tensor(self.out_channels)
-        bias.data.zero_()
-        self.bias = nn.Parameter(bias)
+        if self.bias:
+            bias = torch.zeros(self.out_channels)
+            self.bias = nn.Parameter(bias)
+        else:
+            self.bias = None
 
     def forward(self, x):
 
@@ -460,7 +471,7 @@ class QConvTranspose3d(nn.Module):
     """
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, out_padding=0, groups=1, dilation=1, seed=0, spinor=False):
+                 padding=0, out_padding=0, groups=1, bias=True, dilation=1, spinor=False):
         """
         @type in_channels: int
         @type out_channels: int
@@ -469,8 +480,8 @@ class QConvTranspose3d(nn.Module):
         @type padding: int
         @type out_padding: int
         @type groups: int
+        @type bias: bool
         @type dilation: int
-        @type seed: int
         @type spinor: bool
         """
         super(QConvTranspose3d, self).__init__()
@@ -487,7 +498,6 @@ class QConvTranspose3d(nn.Module):
         self.out_padding = out_padding
         self.groups = groups
         self.dilation = dilation
-        self.seed = seed
         self.spinor = spinor
 
         self.reset_parameters()
@@ -502,9 +512,11 @@ class QConvTranspose3d(nn.Module):
         else:
             self.weight = nn.Parameter(get_real_matrix(r, i, j, k))
 
-        bias = torch.Tensor(self.out_channels)
-        bias.data.zero_()
-        self.bias = nn.Parameter(bias)
+        if self.bias:
+            bias = torch.zeros(self.out_channels)
+            self.bias = nn.Parameter(bias)
+        else:
+            self.bias = None
 
     def forward(self, x):
 
