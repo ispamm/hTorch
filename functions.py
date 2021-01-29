@@ -38,14 +38,13 @@ import torch
 import torch.nn.functional as F
 from math import factorial
 from quaternion import Quaternion
-from utils import *
 import math
 from copy import deepcopy
 
 Q = Quaternion
 
 
-def initialize_linear(in_channels, out_channels, init_mode="xavier"):
+def initialize_linear(in_channels, out_channels, init_mode="he"):
     """
     Quaternion initialization
     It can be shown [7] that the variance for the magnitude is given
@@ -73,19 +72,19 @@ def initialize_linear(in_channels, out_channels, init_mode="xavier"):
     img_mat = torch.Tensor(*size_img).uniform_(-1, 1)
     mat = Q(torch.cat([torch.zeros(size_real), img_mat], 1))
 
-    mat /= bcast(mat.norm)
+    mat /= torch.cat([mat.norm]*4, 1)
     phase = torch.Tensor(*size_real).uniform_(-np.pi, np.pi)
     magnitude = torch.from_numpy(chi.rvs(4, loc=0, scale=scale, size=size_real))
 
     r = magnitude * torch.cos(phase)
     factor = magnitude * torch.sin(phase)
-    mat *= bcast(factor)
+    mat *= torch.cat([factor]*4, 1)
     mat += r.float()
 
     return mat
 
 
-def initialize_conv(in_channels, out_channels, kernel_size=[2, 2], init_mode="xavier"):
+def initialize_conv(in_channels, out_channels, kernel_size=[2, 2], init_mode="he"):
     """
     Quaternion initialization
     It can be shown [7] that the variance for the magnitude is given
@@ -99,6 +98,7 @@ def initialize_conv(in_channels, out_channels, kernel_size=[2, 2], init_mode="xa
     @type kernel_size: int/list/tuple
     @type init_mode: str
     """
+    
     prod = np.prod(kernel_size)
     if init_mode == "he":
         scale = 1 / np.sqrt(in_channels * prod * 2)
@@ -123,35 +123,17 @@ def initialize_conv(in_channels, out_channels, kernel_size=[2, 2], init_mode="xa
     img_mat = torch.Tensor(*size_img).uniform_(-1, 1)
     mat = Q(torch.cat([torch.zeros(size), img_mat], 1))
 
-    mat /= bcast(mat.norm)
+    mat /= torch.cat([mat.norm]*4, 1)
     phase = torch.Tensor(*size).uniform_(-np.pi, np.pi)
     magnitude = chi.rvs(4, loc=0, scale=scale, size=size)
     magnitude = torch.from_numpy(magnitude)
 
     r = magnitude * torch.cos(phase)
     factor = magnitude * torch.sin(phase)
-    mat *= bcast(factor)
+    mat *= torch.cat([factor]*4, 1)
     mat += r.float()
 
     return mat
-
-
-def initialize_bn():
-    """
-    Batch norm beta and gamma initialization.
-    gamma is a 4x4 symmetric matrix so it only has 10 learnable params and 
-    the diagonoal elements are set to 1/2 to preserve the variance [2].
-    beta is initialized at 0
-    """
-
-    gamma = torch.zeros((10))
-    gamma[0] = 0.5
-    gamma[2] = 0.5
-    gamma[5] = 0.5
-    gamma[9] = 0.5
-    beta = torch.zeros((4))
-
-    return gamma, beta
 
 
 def get_real_matrix(r, i, j, k):
