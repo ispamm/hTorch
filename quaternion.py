@@ -1,13 +1,5 @@
-"""
-Quaternion class
-"""
-
 import torch
 import numpy
-from utils import *
-import torch.nn as nn
-import torch.nn.functional as F
-
 
 class Quaternion:
 
@@ -18,7 +10,10 @@ class Quaternion:
 
         if isinstance(q, Quaternion):
             self.q = q.q
-            a, b, c, d = chunk(self.q)
+            if len(self.q.shape) == 1:
+                a, b, c, d = torch.chunk(self.q, 4, 0)
+            else:
+                a, b, c, d = torch.chunk(self.q, 4, 1)
             self.shape = self.q.shape
             self.a = a
             self.b = b
@@ -28,7 +23,7 @@ class Quaternion:
         elif isinstance(q, torch.Tensor) and len(q.shape) > 1:
             q = q.float()
             self.q = q
-            a, b, c, d = chunk(self.q)
+            a, b, c, d = torch.chunk(self.q, 1)
             self.shape = self.q.shape
             self.a = a
             self.b = b
@@ -54,15 +49,15 @@ class Quaternion:
 
     @property
     def i_mul(self):
-        return self.__class__(bcast(self.a, self.b, -self.c, -self.d))
+        return self.__class__(torch.cat([self.a, self.b, -self.c, -self.d], 1))
 
     @property
     def j_mul(self):
-        return self.__class__(bcast(self.a, -self.b, self.c, -self.d))
+        return self.__class__(torch.cat([self.a, -self.b, self.c, -self.d], 1))
 
     @property
     def k_mul(self):
-        return self.__class__(bcast(self.a, -self.b, -self.c, self.d))
+        return self.__class__(torch.cat([self.a, -self.b, -self.c, self.d], 1))
 
     @property
     def min(self):
@@ -86,7 +81,7 @@ class Quaternion:
     def v(self):
 
         if len(self.shape) > 1:
-            vec = self.__class__(bcast(torch.zeros_like(self.b), self.b, self.c, self.d))
+            vec = self.__class__(torch.cat([torch.zeros_like(self.b), self.b, self.c, self.d], 1))
         else:
             vec = self.__class__([0, self.b, self.c, self.d])
         return vec
@@ -99,7 +94,7 @@ class Quaternion:
     def conj(self):
 
         if len(self.shape) > 1:
-            con = self.__class__(bcast(self.a, -self.b, -self.c, -self.d))
+            con = self.__class__(torch.cat([self.a, -self.b, -self.c, -self.d], 1))
         else:
             con = self.__class__([self.a, -self.b, -self.c, -self.d])
 
@@ -132,6 +127,7 @@ class Quaternion:
             vector = exp * (v / v_norm) * torch.sin(v_norm)
             out = real + vector
         else:
+            print(v, v_norm, exp)
             vector = exp * (v / v_norm) * torch.sin(v_norm)
             out = [real, vector[1], vector[2], vector[3]]
 
@@ -179,7 +175,7 @@ class Quaternion:
                 out = self.q + other
             elif other.shape[1] * 4 == self.shape[1]:
                 a = self.a + other
-                out = bcast(a, self.b, self.c, self.d)
+                out = torch.cat([a, self.b, self.c, self.d], 1)
             elif other.shape == self.shape:
                 out = self.q + other
             else:
@@ -203,7 +199,7 @@ class Quaternion:
                 out = other + self.q
             elif other.shape[1] * 4 == self.shape[1]:
                 a = other + self.a
-                out = bcast(a, self.b, self.c, self.d)
+                out = torch.cat([a, self.b, self.c, self.d], 1)
             else:
                 raise ValueError("cannot broadcast shapes")
 
@@ -231,7 +227,7 @@ class Quaternion:
                 out = self.q - other
             elif other.shape[1] * 4 == self.shape[1]:
                 a = self.a - other
-                out = bcast(a, self.b, self.c, self.d)
+                out = torch.cat([a, self.b, self.c, self.d], 1)
             else:
                 raise ValueError("cannot broadcast shapes")
 
@@ -250,7 +246,7 @@ class Quaternion:
                 out = other - self.q
             elif other.shape[1] * 4 == self.shape[1]:
                 a = other - self.a
-                out = bcast(a, self.b, self.c, self.d)
+                out = torch.cat([a, self.b, self.c, self.d], 1)
             else:
                 raise ValueError("cannot broadcast shapes")
 
@@ -287,7 +283,7 @@ class Quaternion:
             k = self.a * d2 + self.b * c2 - self.c * b2 + self.d * a2
 
             if len(self.shape) > 1 or len(other.shape) > 1:
-                out = bcast(r, i, j, k)
+                out = torch.cat([r, i, j, k], 1)
             else:
                 out = [r, i, j, k]
 
@@ -298,7 +294,7 @@ class Quaternion:
             if sum(other.shape) in [0, 1] or other.shape == self.shape:
                 out = other * self.q
             elif other.shape[1] * 4 == self.shape[1]:
-                out = bcast(other) * self.q
+                out = torch.cat([other]*4, 1) * self.q
             else:
                 raise ValueError("cannot broadcast shapes")
 
@@ -317,7 +313,7 @@ class Quaternion:
             if sum(other.shape) in [0, 1] or other.shape == self.shape:
                 out = other * self.q
             elif other.shape[1] * 4 == self.shape[1]:
-                out = bcast(other) * self.q
+                out = torch.cat([other]*4, 1) * self.q
             else:
                 raise ValueError("cannot broadcast shapes")
 
@@ -344,7 +340,7 @@ class Quaternion:
             if sum(other.shape) in [0, 1] or other.shape == self.shape:
                 out = self.q / other
             elif other.shape[1] * 4 == self.shape[1]:
-                out = self.q / bcast(other)
+                out = self.q / torch.cat([other]*4)
             else:
                 raise ValueError("cannot broadcast shapes")
             out = self.__class__(out)
@@ -365,7 +361,7 @@ class Quaternion:
             if sum(other.shape) in [0, 1] or other.shape == self.shape:
                 out = other / self.q
             elif other.shape[1] * 4 == self.shape[1]:
-                out = bcast(other) / self.q
+                out = torch.cat([other]*4, 1) / self.q
             else:
                 raise ValueError("cannot broadcast shapes")
             out = self.__class__(out)
