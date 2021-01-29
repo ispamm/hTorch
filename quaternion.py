@@ -23,7 +23,7 @@ class Quaternion:
         elif isinstance(q, torch.Tensor) and len(q.shape) > 1:
             q = q.float()
             self.q = q
-            a, b, c, d = torch.chunk(self.q, 1)
+            a, b, c, d = torch.chunk(self.q, 4, 1)
             self.shape = self.q.shape
             self.a = a
             self.b = b
