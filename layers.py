@@ -4,7 +4,6 @@ import torch.nn.functional as F
 from functions import *
 from quaternion import Quaternion
 from torch.nn import init
-from utils import *
 
 Q = Quaternion
 
