@@ -5,7 +5,32 @@ import torch.nn.functional as F
 import re
 import sys
 from functions import *
-from utils import to_hermitian, apply_quaternion_gradient
+
+def to_hermitian(weight):
+    """
+    applies hermitian (conjugate + tranpose) of a weight matrix
+    
+    @type weight: torch.Tensor
+    """
+    
+    r, i, j, k = torch.chunk(weight, 4, 1)
+    return get_real_matrix(r, -i, -j, -k).permute(1, 0, 2, 3)
+
+
+def apply_quaternion_gradient(model):
+    """
+    hooks real-valued gradients and transforms them into one for 
+    quaternion gradient descent
+    
+    @type model: nn.Module
+    """
+    
+    for name, parameter in zip(model.children(), model.parameters()):
+        if name in ["Linear","Conv1d", "Conv2d","Conv3d",
+                    "ConvTranspose1d", "ConvTranspose2d", "ConvTranspose3d"]:        
+            parameter.register_hook(lambda grad: 4*to_hermitian(grad))
+    
+    return model
 
 def convert_to_quaternion(Net: nn.Module, spinor=False):
     """
@@ -14,7 +39,6 @@ def convert_to_quaternion(Net: nn.Module, spinor=False):
     last_module = len([mod for mod in Net.children()])
     for n, (name, layer) in enumerate(Net.named_children()):
         
-        print(layer)
         layer_name = re.match("^\w+", str(layer)).group()
         if layer_name == "Linear" and n != last_module-1:
             
