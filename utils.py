@@ -37,12 +37,12 @@ def bstack(*args, n=4, dim=0):
 def to_hermitian(weight):
     
     r, i, j, k = torch.chunk(weight, 4, 1)
-    return get_real_matrix(r, -i, -j , -k).permute(1, 0, 2, 3)
+    return get_real_matrix(r, -i, -j, -k).permute(1, 0, 2, 3)
 
 
 def apply_quaternion_gradient(model):
     
-    for name, parameter in model.named_parameters():
+    for name, parameter in zip(model.children(), model.parameters()):
         if name in ["Linear","Conv1d", "Conv2d","Conv3d",
                     "ConvTranspose1d", "ConvTranspose2d", "ConvTranspose3d"]:        
             parameter.register_hook(lambda grad: 4*to_hermitian(grad))
