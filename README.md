@@ -5,6 +5,8 @@ find the code for quaternion batch normalization among the classical layers.<br>
 Differently from other repos, every weight parameter is its own, thus every single real or imaginary part is *not* considered a parameter. <br>
 The code also contains a function to turn real-valued NN's into quaternion ones.
 
+![image](https://github.com/giorgiozannini/QNN/blob/main/image.png?raw=true)
+
 #TODO:
 - fix bn
 - qselu (?)
