@@ -6,8 +6,6 @@ Differently from other repos, every weight parameter is its own, thus every sing
 The code also contains a function to turn real-valued NN's into quaternion ones.
 
 #TODO:
-- add example
-- quaternion backprop
 - fix bn
 - qselu (?)
 - speed up code
