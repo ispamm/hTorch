@@ -84,5 +84,5 @@ def convert_to_quaternion(Net: nn.Module, spinor=False):
             if getattr(Net, name).bias != None:
                 getattr(Net, name).bias.data.zero_()
     
-    return apply_quaternion_gradient(Net)
+    return Net
                 
