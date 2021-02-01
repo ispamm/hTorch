@@ -9,7 +9,6 @@ from copy import deepcopy
 
 Q = Quaternion
 
-
 def initialize_linear(in_channels, out_channels, init_mode="he"):
     """
     Initializes quaternion weight parameter for linear.
