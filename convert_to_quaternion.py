@@ -86,5 +86,6 @@ def convert_to_quaternion(Net, spinor=False):
             if getattr(Net, name).bias != None:
                 getattr(Net, name).bias.data.zero_()
     
-    return apply_quaternion_gradient(Net, layers)
+    # return apply_quaternion_gradient(Net, layers) does not seem to make sense for now
+    return Net
                 
