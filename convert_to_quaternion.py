@@ -6,37 +6,41 @@ import re
 import sys
 from functions import *
 
-def to_hermitian(weight):
+def to_conj(weight):
     """
-    applies hermitian (conjugate + tranpose) of a weight matrix
+    applies conjugation to an incoming weight matrix
     
     @type weight: torch.Tensor
     """
-    
-    r, i, j, k = torch.chunk(weight, 4, 1)
-    return get_real_matrix(r, -i, -j, -k).permute(1, 0, 2, 3)
+    r, i, j, k = torch.chunk(weight, 4, 0)
+    return 4*torch.cat([r, -i, -j, -k], 0)
 
-
-def apply_quaternion_gradient(model):
+def apply_quaternion_gradient(model, layers):
     """
     hooks real-valued gradients and transforms them into one for 
     quaternion gradient descent
     
     @type model: nn.Module
     """
-    
-    for name, parameter in zip(model.children(), model.parameters()):
-        if name in ["Linear","Conv1d", "Conv2d","Conv3d",
-                    "ConvTranspose1d", "ConvTranspose2d", "ConvTranspose3d"]:        
-            parameter.register_hook(lambda grad: 4*to_hermitian(grad))
+   
+    for n, ((_, layer), parameter) in enumerate(zip(model.named_children(), model.parameters())):
+        
+        layer_name = re.match("^\w+", str(layer)).group()
+        if layer_name in layers and len(parameter.shape) > 1 and n != 1: 
+            parameter.register_hook(to_conj)
     
     return model
 
-def convert_to_quaternion(Net: nn.Module, spinor=False):
+def convert_to_quaternion(Net, spinor=False):
     """
     converts a real_valued initialized Network to a quaternion one
+    
+    @type Net: nn.Module
+    @type spinor: bool
     """
     last_module = len([mod for mod in Net.children()])
+    layers = ["Linear","Conv1d", "Conv2d","Conv3d",
+                    "ConvTranspose1d", "ConvTranspose2d", "ConvTranspose3d"]
     for n, (name, layer) in enumerate(Net.named_children()):
         
         layer_name = re.match("^\w+", str(layer)).group()
@@ -49,14 +53,13 @@ def convert_to_quaternion(Net: nn.Module, spinor=False):
             assert out_features % 4 == 0, "number of out_channels must be divisible by 4"
             
             quaternion_weight = initialize_linear(in_features, out_features)
-            r, i, j, k = quaternion_weight.chunk()
             
             if spinor:
-                weights = get_rot_matrix(r, i, j, k)
+                weight = quaternion_weight.real_rot_repr
             else:
-                weights = get_real_matrix(r, i, j, k)
+                weight = quaternion_weight.real_repr
             
-            getattr(Net, name).weight = nn.Parameter(weights.permute(1,0))
+            getattr(Net, name).weight = nn.Parameter(weight)
             
             if getattr(Net, name).bias != None:
                 getattr(Net, name).bias.data.zero_()
@@ -72,17 +75,16 @@ def convert_to_quaternion(Net: nn.Module, spinor=False):
             assert out_features % 4 == 0, "number of out_channels must be divisible by 4"
             
             quaternion_weight = initialize_conv(in_features, out_features, kernel_size)
-            r, i, j, k = quaternion_weight.chunk()
             
             if spinor:
-                weights = get_rot_matrix(r, i, j, k)
+                weight = get_rot_matrix(r, i, j, k)
             else:
-                weights = get_real_matrix(r, i, j, k)
+                weight = quaternion_weight.real_repr
             
-            getattr(Net, name).weight = nn.Parameter(weights.permute(1, 0, 2, 3))
+            getattr(Net, name).weight = nn.Parameter(weight)
             
             if getattr(Net, name).bias != None:
                 getattr(Net, name).bias.data.zero_()
     
-    return Net
+    return apply_quaternion_gradient(Net, layers)
                 

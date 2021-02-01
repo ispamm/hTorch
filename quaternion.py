@@ -76,7 +76,34 @@ class Quaternion:
             inverse = self.conj / self.sq_norm
 
         return inverse
+    
+    @property
+    def T(self):
+        zipped = torch.cat([self.a, self.b, self.c, self.d], 1)
+        return self.__class__(zipped)
+    
+    @property
+    def real_repr(self):
+        
+        a, b, c, d = self.a.transpose(1,0), self.b.transpose(1,0), self.c.transpose(1,0), self.d.transpose(1,0)
+        weight = torch.cat([torch.cat([a, -b, -c, -d], dim=1),
+                            torch.cat([b,  a, -d,  c], dim=1),
+                            torch.cat([c,  d,  a, -b], dim=1),
+                            torch.cat([d, -c,  b,  a], dim=1)], dim=0)
 
+        return weight
+    
+    @property
+    def real_rot_repr(self):
+        
+        a, b, c, d = self.a.transpose(1,0), self.b.transpose(1,0), self.c.transpose(1,0), self.d.transpose(1,0)
+        row1 = torch.cat([torch.zeros_like(b)] * 4, 1)
+        row2 = torch.cat([torch.zeros_like(b), 1 - 2 * (c ** 2 + d ** 2), 2 * (b * c - d * a), 2 * (b * d + c * a)], 1)
+        row3 = torch.cat([torch.zeros_like(b), 2 * (b * c + d * a), 1 - 2 * (b ** 2 + d ** 2), 2 * (c * d - b * a)], 1)
+        row4 = torch.cat([torch.zeros_like(b), 2 * (b * d - c * a), 2 * (c * d + b * a), 1 - 2 * (b ** 2 + c ** 2)], 1)
+
+        return torch.cat([row1, row2, row3, row4], 0)
+    
     @property
     def v(self):
 

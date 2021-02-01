@@ -13,14 +13,13 @@ class QConv1d(nn.Module):
     """
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, out_padding=0, groups=1, bias=True, dilation=1, spinor=False):
+                 padding=0, groups=1, bias=True, dilation=1, spinor=False):
         """
         @type in_channels: int
         @type out_channels: int
         @type kernel_size: int/tuple/list
         @type stride: int/tuple/list
         @type padding: int
-        @type out_padding: int
         @type groups: int
         @type bias: bool
         @type dilation: int
@@ -37,7 +36,6 @@ class QConv1d(nn.Module):
         self.kernel_size = kernel_size
         self.stride = stride
         self.padding = padding
-        self.out_padding = out_padding
         self.groups = groups
         self.bias = bias
         self.dilation = dilation
@@ -46,14 +44,14 @@ class QConv1d(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        mat = initialize_conv(self.in_channels, self.out_channels,
+        
+        quaternion_weight = initialize_conv(self.in_channels, self.out_channels,
                               kernel_size=self.kernel_size)
-        r, i, j, k = mat.chunk()
 
         if self.spinor:
-            self.weight = nn.Parameter(get_rot_matrix(r, i, j, k)).permute(1,0,2,3)
+            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
         else:
-            self.weight = nn.Parameter(get_real_matrix(r, i, j, k)).permute(1,0,2,3)
+            self.weight = nn.Parameter(quaternion_weight.real_repr)
         
         if self.bias:
             bias = torch.zeros(self.out_channels)
@@ -63,8 +61,8 @@ class QConv1d(nn.Module):
 
     def forward(self, x):
 
-        return F.conv1d(x, self.weight, self.bias, self.stride, self.padding,
-                        self.out_padding, self.groups, self.bias, self.dilation)
+        return F.conv1d(x, self.weight, self.bias, self.stride,
+                        self.padding, self.dilation, self.groups)
 
 
 class QConv2d(nn.Module):
@@ -73,14 +71,13 @@ class QConv2d(nn.Module):
     """
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, out_padding=0, groups=1, bias=True, dilation=1, spinor=False):
+                 padding=0, groups=1, bias=True, dilation=1, spinor=False):
         """
         @type in_channels: int
         @type out_channels: int
         @type kernel_size: int/tuple/list
         @type stride: int/tuple/list
         @type padding: int
-        @type out_padding: int
         @type groups: int
         @type bias: bool
         @type dilation: int
@@ -97,7 +94,6 @@ class QConv2d(nn.Module):
         self.kernel_size = kernel_size
         self.stride = stride
         self.padding = padding
-        self.out_padding = out_padding
         self.groups = groups
         self.bias = bias
         self.dilation = dilation
@@ -106,14 +102,14 @@ class QConv2d(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        mat = initialize_conv(self.in_channels, self.out_channels,
+        
+        quaternion_weight = initialize_conv(self.in_channels, self.out_channels,
                               kernel_size=self.kernel_size)
-        r, i, j, k = mat.chunk()
-
+        
         if self.spinor:
-            self.weight = nn.Parameter(get_rot_matrix(r, i, j, k)).permute(1,0,2,3)
+            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
         else:
-            self.weight = nn.Parameter(get_real_matrix(r, i, j, k)).permute(1,0,2,3)
+            self.weight = nn.Parameter(quaternion_weight.real_repr)
 
         if self.bias:
             bias = torch.zeros(self.out_channels)
@@ -123,8 +119,8 @@ class QConv2d(nn.Module):
 
     def forward(self, x):
 
-        return F.conv2d(x, self.weight, self.bias, self.stride, self.padding,
-                        self.out_padding, self.groups, self.bias, self.dilation)
+        return F.conv2d(x, self.weight, self.bias, self.stride,
+                        self.padding, self.dilation, self.groups)
 
 
 class QConv3d(nn.Module):
@@ -133,14 +129,13 @@ class QConv3d(nn.Module):
     """
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, out_padding=0, groups=1, bias=True, dilation=1, spinor=False):
+                 padding=0, groups=1, bias=True, dilation=1, spinor=False):
         """
         @type in_channels: int
         @type out_channels: int
         @type kernel_size: int/tuple/list
         @type stride: int/tuple/list
         @type padding: int
-        @type out_padding: int
         @type groups: int
         @type bias: bool
         @type dilation: int
@@ -157,7 +152,6 @@ class QConv3d(nn.Module):
         self.kernel_size = kernel_size
         self.stride = stride
         self.padding = padding
-        self.out_padding = out_padding
         self.groups = groups
         self.bias = bias
         self.dilation = dilation
@@ -166,14 +160,14 @@ class QConv3d(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        mat = initialize_conv(self.in_channels, self.out_channels,
+        
+        quaternion_weight = initialize_conv(self.in_channels, self.out_channels,
                               kernel_size=self.kernel_size)
-        r, i, j, k = mat.chunk()
 
         if self.spinor:
-            self.weight = nn.Parameter(get_rot_matrix(r, i, j, k)).permute(1,0,2,3)
+            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
         else:
-            self.weight = nn.Parameter(get_real_matrix(r, i, j, k)).permute(1,0,2,3)
+            self.weight = nn.Parameter(quaternion_weight.real_repr)
 
         if self.bias:
             bias = torch.zeros(self.out_channels)
@@ -183,8 +177,8 @@ class QConv3d(nn.Module):
 
     def forward(self, x):
 
-        return F.conv3d(x, self.weight, self.bias, self.stride, self.padding,
-                        self.out_padding, self.groups, self.bias, self.dilation)
+        return F.conv3d(x, self.weight, self.bias, self.stride,
+                        self.padding, self.dilation, self.groups)
 
 
 class QLinear(nn.Module):
@@ -207,13 +201,13 @@ class QLinear(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        mat = initialize_linear(self.in_channels, self.out_channels)
-        r, i, j, k = mat.chunk()
+        
+        quaternion_weight = initialize_linear(self.in_channels, self.out_channels)
 
         if self.spinor:
-            self.weight = nn.Parameter(get_rot_matrix(r, i, j, k)).permute(1, 0)
+            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
         else:
-            self.weight = nn.Parameter(get_real_matrix(r, i, j, k)).permute(1, 0)
+            self.weight = nn.Parameter(quaternion_weight.real_repr)
 
         if self.bias:
             bias = torch.zeros(self.out_channels)
@@ -349,14 +343,14 @@ class QConvTranspose1d(nn.Module):
     """
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, out_padding=0, groups=1, bias=True, dilation=1, spinor=False):
+                 padding=0, output_padding=0, groups=1, bias=True, dilation=1, spinor=False):
         """
         @type in_channels: int
         @type out_channels: int
         @type kernel_size: int/tuple/list
         @type stride: int/tuple/list
         @type padding: int
-        @type out_padding: int
+        @type output_padding: int
         @type groups: int
         @type bias: bool
         @type dilation: int
@@ -373,7 +367,7 @@ class QConvTranspose1d(nn.Module):
         self.kernel_size = kernel_size
         self.stride = stride
         self.padding = padding
-        self.out_padding = out_padding
+        self.output_padding = output_padding
         self.groups = groups
         self.bias = bias
         self.dilation = dilation
@@ -382,14 +376,14 @@ class QConvTranspose1d(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        mat = initialize_conv(self.in_channels, self.out_channels,
+        
+        quaternion_weight = initialize_conv(self.in_channels, self.out_channels,
                               kernel_size=self.kernel_size)
-        r, i, j, k = mat.chunk()
-
+        
         if self.spinor:
-            self.weight = nn.Parameter(get_rot_matrix(r, i, j, k))
+            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
         else:
-            self.weight = nn.Parameter(get_real_matrix(r, i, j, k))
+            self.weight = nn.Parameter(quaternion_weight.real_repr)
 
         if self.bias:
             bias = torch.zeros(self.out_channels)
@@ -400,7 +394,7 @@ class QConvTranspose1d(nn.Module):
     def forward(self, x):
 
         return F.conv_transpose1d(x, self.weight, self.bias, self.stride,
-                                  self.padding, self.out_padding, self.groups, self.dilation)
+                                  self.padding, self.output_padding, self.groups, self.dilation)
 
 
 
@@ -411,14 +405,14 @@ class QConvTranspose2d(nn.Module):
     """
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, out_padding=0, groups=1, dilation=1, spinor=False):
+                 padding=0, output_padding=0, groups=1, dilation=1, spinor=False):
         """
         @type in_channels: int
         @type out_channels: int
         @type kernel_size: int/tuple/list
         @type stride: int/tuple/list
         @type padding: int
-        @type out_padding: int
+        @type output_padding: int
         @type groups: int
         @type bias: bool
         @type dilation: int
@@ -435,7 +429,7 @@ class QConvTranspose2d(nn.Module):
         self.kernel_size = kernel_size
         self.stride = stride
         self.padding = padding
-        self.out_padding = out_padding
+        self.output_padding = output_padding
         self.groups = groups
         self.dilation = dilation
         self.spinor = spinor
@@ -443,14 +437,14 @@ class QConvTranspose2d(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        mat = initialize_conv(self.in_channels, self.out_channels,
+        
+        quaternion_weight = initialize_conv(self.in_channels, self.out_channels,
                               kernel_size=self.kernel_size)
-        r, i, j, k = mat.chunk()
-
+        
         if self.spinor:
-            self.weight = nn.Parameter(get_rot_matrix(r, i, j, k))
+            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
         else:
-            self.weight = nn.Parameter(get_real_matrix(r, i, j, k))
+            self.weight = nn.Parameter(quaternion_weight.real_repr)
 
         if self.bias:
             bias = torch.zeros(self.out_channels)
@@ -461,7 +455,7 @@ class QConvTranspose2d(nn.Module):
     def forward(self, x):
 
         return F.conv_transpose2d(x, self.weight, self.bias, self.stride,
-                                  self.padding, self.out_padding, self.groups, self.dilation)
+                                  self.padding, self.output_padding, self.groups, self.dilation)
 
 
 class QConvTranspose3d(nn.Module):
@@ -470,14 +464,14 @@ class QConvTranspose3d(nn.Module):
     """
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, out_padding=0, groups=1, bias=True, dilation=1, spinor=False):
+                 padding=0, output_padding=0, groups=1, bias=True, dilation=1, spinor=False):
         """
         @type in_channels: int
         @type out_channels: int
         @type kernel_size: int/tuple/list
         @type stride: int/tuple/list
         @type padding: int
-        @type out_padding: int
+        @type output_padding: int
         @type groups: int
         @type bias: bool
         @type dilation: int
@@ -494,7 +488,7 @@ class QConvTranspose3d(nn.Module):
         self.kernel_size = kernel_size
         self.stride = stride
         self.padding = padding
-        self.out_padding = out_padding
+        self.output_padding = output_padding
         self.groups = groups
         self.dilation = dilation
         self.spinor = spinor
@@ -502,14 +496,14 @@ class QConvTranspose3d(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        mat = initialize_conv(self.in_channels, self.out_channels,
+        
+        quaternion_weight = initialize_conv(self.in_channels, self.out_channels,
                               kernel_size=self.kernel_size)
-        r, i, j, k = mat.chunk()
-
+        
         if self.spinor:
-            self.weight = nn.Parameter(get_rot_matrix(r, i, j, k))
+            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
         else:
-            self.weight = nn.Parameter(get_real_matrix(r, i, j, k))
+            self.weight = nn.Parameter(quaternion_weight.real_repr)
 
         if self.bias:
             bias = torch.zeros(self.out_channels)
@@ -520,7 +514,7 @@ class QConvTranspose3d(nn.Module):
     def forward(self, x):
 
         return F.conv_transpose3d(x, self.weight, self.bias, self.stride,
-                                  self.padding, self.out_padding, self.groups, self.dilation)
+                                  self.padding, self.output_padding, self.groups, self.dilation)
 
 # reference https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=8632910
 class QMaxPool2d(nn.Module):
