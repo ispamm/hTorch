@@ -4,7 +4,9 @@ import numpy
 class Quaternion:
 
     def __init__(self, q):
-
+        
+        global device
+        
         if isinstance(q, numpy.ndarray):
             q = list(q)
 
@@ -91,7 +93,7 @@ class Quaternion:
                             torch.cat([c,  d,  a, -b], dim=1),
                             torch.cat([d, -c,  b,  a], dim=1)], dim=0)
 
-        return weight
+        return self.__class__(weight)
     
     @property
     def real_rot_repr(self):
@@ -101,8 +103,9 @@ class Quaternion:
         row2 = torch.cat([torch.zeros_like(b), 1 - 2 * (c ** 2 + d ** 2), 2 * (b * c - d * a), 2 * (b * d + c * a)], 1)
         row3 = torch.cat([torch.zeros_like(b), 2 * (b * c + d * a), 1 - 2 * (b ** 2 + d ** 2), 2 * (c * d - b * a)], 1)
         row4 = torch.cat([torch.zeros_like(b), 2 * (b * d - c * a), 2 * (c * d + b * a), 1 - 2 * (b ** 2 + c ** 2)], 1)
-
-        return torch.cat([row1, row2, row3, row4], 0)
+        weight = torch.cat([row1, row2, row3, row4], 0)
+        
+        return self.__class__(weight) 
     
     @property
     def v(self):
@@ -130,6 +133,9 @@ class Quaternion:
     @property
     def norm(self):
         return torch.sqrt(self.a ** 2 + self.b ** 2 + self.c ** 2 + self.d ** 2 + 1e-10)
+    
+    def torch(self):
+        return self.q
 
     def flatten(self, start_dim):
         return self.q.flatten(start_dim)
