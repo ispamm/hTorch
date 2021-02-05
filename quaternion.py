@@ -4,9 +4,7 @@ import numpy
 class Quaternion:
 
     def __init__(self, q):
-        
-        global device
-        
+                
         if isinstance(q, numpy.ndarray):
             q = list(q)
 
@@ -48,6 +46,8 @@ class Quaternion:
             self.b = q[1]
             self.c = q[2]
             self.d = q[3]
+            
+        self.grad = None
 
     @property
     def i_mul(self):
@@ -160,7 +160,6 @@ class Quaternion:
             vector = exp * (v / v_norm) * torch.sin(v_norm)
             out = real + vector
         else:
-            print(v, v_norm, exp)
             vector = exp * (v / v_norm) * torch.sin(v_norm)
             out = [real, vector[1], vector[2], vector[3]]
 
