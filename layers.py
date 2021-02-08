@@ -306,7 +306,6 @@ class QBatchNorm2d(nn.Module):
             mean = x.mean(dim=axes)
             if self.running_mean is not None:
                 with torch.no_grad():
-                    print(self.running_mean.device, mean.device)
                     self.running_mean = self.momentum * self.running_mean +\
                                         (1.0 - self.momentum) * mean
         else:
