@@ -227,6 +227,8 @@ class QLinear(nn.Module):
         return F.linear(x, self.weight, self.bias)
 
 
+# please refer to https://github.com/ChihebTrabelsi/deep_complex_networks for
+# the N X N whitening
 class QBatchNorm2d(nn.Module):
     """
     Quaternion batch normalization 2d
@@ -255,34 +257,35 @@ class QBatchNorm2d(nn.Module):
         self.affine = affine
         self.training = training
         self.register_buffer("I", torch.Tensor([1]))
-        self.eps = eps
         self.track_running_stats = track_running_stats
-
+        
+        self.register_buffer('eye', torch.diag(torch.cat([torch.Tensor([eps])]*4)).unsqueeze(0))
+        
         if self.affine:
             self.weight = torch.nn.Parameter(torch.zeros(4, 4, in_channels // 4))
             self.bias = torch.nn.Parameter(torch.zeros(4, in_channels // 4))
         else:
             self.register_parameter('weight', None)
-            self.bias = None
+            self.register_parameter('bias', None)
 
         if self.track_running_stats:
             self.register_buffer('running_mean', torch.zeros(4, in_channels // 4))
-            self.register_buffer('running_var', torch.zeros(4, 4, in_channels // 4))
+            self.register_buffer('running_invsq_cov', torch.zeros(in_channels // 4, 4, 4))
         else:
             self.register_parameter('running_mean', None)
-            self.register_parameter('running_var', None)
-            self.register_parameter('num_batches_tracked', None)
-        self.momentum = 0.1
+            self.register_parameter('running_invsq_cov', None)
+        
+        self.momentum = momentum
 
         self.reset_parameters()
 
     def reset_running_stats(self):
         if self.track_running_stats:
             self.running_mean.zero_()
-            self.running_var[0, 0].fill_(1)
-            self.running_var[1, 1].fill_(1)
-            self.running_var[2, 2].fill_(1)
-            self.running_var[3, 3].fill_(1)
+            self.running_invsq_cov[: ,0, 0].fill_(1)
+            self.running_invsq_cov[: ,1, 1].fill_(1)
+            self.running_invsq_cov[: ,2, 2].fill_(1)
+            self.running_invsq_cov[: ,3, 3].fill_(1)
 
     def reset_parameters(self):
         self.reset_running_stats()
@@ -303,7 +306,9 @@ class QBatchNorm2d(nn.Module):
             mean = x.mean(dim=axes)
             if self.running_mean is not None:
                 with torch.no_grad():
-                    self.running_mean += self.momentum * (mean - self.running_mean)
+                    print(self.running_mean.device, mean.device)
+                    self.running_mean = self.momentum * self.running_mean +\
+                                        (1.0 - self.momentum) * mean
         else:
             mean = self.running_mean
         x = x - mean.reshape(d, *shape)
@@ -311,21 +316,24 @@ class QBatchNorm2d(nn.Module):
         if self.training:
             perm = x.permute(2, 0, *axes).flatten(2, -1)
             cov = torch.matmul(perm, perm.transpose(-1, -2)) / perm.shape[-1]
-            if self.running_var is not None:
+            ell = torch.cholesky(cov + self.eye, upper=True)
+
+            
+            if self.running_invsq_cov is not None:
                 with torch.no_grad():
-                    self.running_var += self.momentum * (cov.permute(1, 2, 0) - self.running_var)
+                    self.running_invsq_cov = self.momentum * self.running_invsq_cov +\
+                                             (1.0 - self.momentum) * ell
 
         else:
-            cov = self.running_var.permute(2, 0, 1)
+            invsq_cov = self.running_invsq_cov
 
-        eye = self.eps * torch.diag(torch.cat([self.I] * cov.size(1))).unsqueeze(0)
-        ell = torch.cholesky(cov + eye, upper=True)
         soln = torch.triangular_solve(
             x.unsqueeze(-1).permute(*range(1, x.dim()), 0, -1),
-            ell.reshape(*shape, d, d))
+            ell.reshape(*shape, d, d)
+        )
 
-        soln = soln.solution.squeeze(-1)
-        z = torch.stack(torch.unbind(soln, dim=-1), dim=0)
+        invsq_cov = soln.solution.squeeze(-1)
+        z = torch.stack(torch.unbind(invsq_cov, dim=-1), dim=0)
 
         if self.affine:
             shape = 1, z.shape[2], *([1] * (x.dim() - 3))
