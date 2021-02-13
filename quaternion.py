@@ -1,51 +1,52 @@
 import torch
 import numpy
 
-class Quaternion:
+def real_repr(q):
+    a, b, c, d = get_parts(q)
+    a, b, c, d = a.transpose(1,0),\
+                 b.transpose(1,0),\
+                 c.transpose(1,0),\
+                 d.transpose(1,0)
 
-    def __init__(self, q):
+    weight = torch.cat([torch.cat([a, -b, -c, -d], dim=1),
+                        torch.cat([b,  a, -d,  c], dim=1),
+                        torch.cat([c,  d,  a, -b], dim=1),
+                        torch.cat([d, -c,  b,  a], dim=1)], dim=0)
+    return weight
+
+def get_parts(q):
+
+    if len(q.shape) == 1:
+        a, b, c, d = torch.chunk(q, 4, 0)
+    else:
+        a, b, c, d = torch.chunk(q, 4, 1)
+
+    return a, b, c, d
+
+class QuaternionTensor(torch.Tensor):
+    
+    @staticmethod 
+    def __new__(cls, q, real_repr_flag=True, *args, **kwargs):
+        q = real_repr(q)
+        return super().__new__(cls, q, *args, **kwargs) 
+
+    def __init__(self, q, real_repr_flag=True):
+        super().__init__()
                 
-        if isinstance(q, numpy.ndarray):
-            q = list(q)
-
-        if isinstance(q, Quaternion):
-            self.q = q.q
-            if len(self.q.shape) == 1:
-                a, b, c, d = torch.chunk(self.q, 4, 0)
-            else:
-                a, b, c, d = torch.chunk(self.q, 4, 1)
-            self.shape = self.q.shape
+        if isinstance(q, torch.Tensor):
+  
+            a, b, c, d = get_parts(q)
+                
             self.a = a
             self.b = b
             self.c = c
             self.d = d
+            
 
-        elif isinstance(q, torch.Tensor) and len(q.shape) > 1:
-            q = q.float()
-            self.q = q
-            a, b, c, d = torch.chunk(self.q, 4, 1)
-            self.shape = self.q.shape
-            self.a = a
-            self.b = b
-            self.c = c
-            self.d = d
 
-        elif isinstance(q, (tuple, list)):
-            q = torch.Tensor(q)
-            self.q = q
-            self.shape = self.q.shape
-            self.a = q[0]
-            self.b = q[1]
-            self.c = q[2]
-            self.d = q[3]
-
-        elif isinstance(q, torch.Tensor) and len(q.shape) == 1:
-            self.q = q.float()
-            self.shape = self.q.shape
-            self.a = q[0]
-            self.b = q[1]
-            self.c = q[2]
-            self.d = q[3]
+            
+        elif isinstance(q, (tuple, list, numpy.array)):
+            self.__class__(super().__init__(q))
             
         self.grad = None
 
@@ -83,29 +84,26 @@ class Quaternion:
     def T(self):
         zipped = torch.cat([self.a, self.b, self.c, self.d], 1)
         return self.__class__(zipped)
-    
-    @property
-    def real_repr(self):
-        
-        a, b, c, d = self.a.transpose(1,0), self.b.transpose(1,0), self.c.transpose(1,0), self.d.transpose(1,0)
-        weight = torch.cat([torch.cat([a, -b, -c, -d], dim=1),
-                            torch.cat([b,  a, -d,  c], dim=1),
-                            torch.cat([c,  d,  a, -b], dim=1),
-                            torch.cat([d, -c,  b,  a], dim=1)], dim=0)
 
-        return self.__class__(weight)
+    @property
+    def real_repr(self):   
+        return self.__class__(self._real_repr(), False)
     
     @property
     def real_rot_repr(self):
         
-        a, b, c, d = self.a.transpose(1,0), self.b.transpose(1,0), self.c.transpose(1,0), self.d.transpose(1,0)
+        a, b, c, d = self.a.transpose(1,0),\
+                     self.b.transpose(1,0),\
+                     self.c.transpose(1,0),\
+                     self.d.transpose(1,0)
+        
         row1 = torch.cat([torch.zeros_like(b)] * 4, 1)
         row2 = torch.cat([torch.zeros_like(b), 1 - 2 * (c ** 2 + d ** 2), 2 * (b * c - d * a), 2 * (b * d + c * a)], 1)
         row3 = torch.cat([torch.zeros_like(b), 2 * (b * c + d * a), 1 - 2 * (b ** 2 + d ** 2), 2 * (c * d - b * a)], 1)
         row4 = torch.cat([torch.zeros_like(b), 2 * (b * d - c * a), 2 * (c * d + b * a), 1 - 2 * (b ** 2 + c ** 2)], 1)
         weight = torch.cat([row1, row2, row3, row4], 0)
         
-        return self.__class__(weight) 
+        return self.__class__(weight, False) 
     
     @property
     def v(self):
@@ -134,20 +132,18 @@ class Quaternion:
     def norm(self):
         return torch.sqrt(self.a ** 2 + self.b ** 2 + self.c ** 2 + self.d ** 2 + 1e-10)
     
-    def torch(self):
-        return self.q
+    def clone(self, *args, **kwargs): 
+        return QuaternionTensor(super().clone(*args, **kwargs))
 
-    def flatten(self, start_dim):
-        return self.q.flatten(start_dim)
-
-    def squeeze(self, dim=None):
-        return self.__class__(torch.squeeze(self.q, dim))
-
-    def unsqueeze(self, dim):
-        return self.__class__(torch.unsqueeze(self.q, dim))
-
-    def reshape(self, shape):
-        return self.__class__(torch.reshape(self.q, shape))
+    def to(self, *args, **kwargs):
+        
+        new_obj = QuaternionTensor([], self.extra_data)
+        tempTensor = super().to(*args, **kwargs)
+        new_obj.data = tempTensor.data
+        new_obj.requires_grad = tempTensor.requires_grad
+        
+        return(new_obj)
+    
 
     def exp(self):
         v = self.v
@@ -184,15 +180,6 @@ class Quaternion:
 
     def chunk(self):
         return self.a, self.b, self.c, self.d
-
-    def __neg__(self):
-        return self.__class__(-self.q)
-
-    def __getitem__(self, n):
-        return self.q[n]
-
-    def __repr__(self):
-        return str(self.__class__.__name__) + "\n" + str(self.q)
 
     def __add__(self, other):
 
@@ -242,17 +229,15 @@ class Quaternion:
 
     def __iadd__(self, other):
         add = self + other
-        self.q = add.q
-        self.a, self.b, self.c, self.d = add.chunk()
-        return self
+        return self.__class__(add)
 
     def __sub__(self, other):
 
         if isinstance(other, Quaternion):
-            out = self.q - other.q
+            out = self - other.q
 
         elif isinstance(other, (int, float)):
-            out = self.q - other
+            out = self - other
 
         elif isinstance(other, torch.Tensor):
             if sum(other.shape) in [0, 1] or other.shape == self.shape:
