@@ -154,27 +154,16 @@ class QuaternionTensor(torch.Tensor):
     def exp(self):
         v = self.v
         a = self.a
-        print("ok")
         v_norm = v.norm
-        print("gyegye")
         exp = torch.clamp(torch.exp(a), 0, 1e10)
-        print("hsjshjwwh")
         real = exp * torch.cos(v_norm)
-        print("aAAAAAAAAAAAAAAAAAAAAH", self.shape)
         
         if len(self.shape) > 1:
-            
-            print(exp)
-            print(v)
-            print(v/v_norm)
+
             vector = exp * (v / v_norm) * torch.sin(v_norm)
-            print("BJSBHSBSHBSH")
             out = real + vector
-            print("ksjss")
         else:
-            print("else")
             vector = exp * (v / v_norm) * torch.sin(v_norm)
-            print("print")
             out = [real, vector[1], vector[2], vector[3]]
 
         return out
