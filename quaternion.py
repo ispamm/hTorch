@@ -280,7 +280,7 @@ class QuaternionTensor(torch.Tensor):
 
     def __mul__(self, other):
         """
-        Product of two quaternions, called "Hailton product".
+        Product of two quaternions, called "Hamilton product".
         Using the basis product's rules and the distributive rule 
         for two quaternions b1 = a1 + b1 i + c1 j + d1 k and
         c1 = a2 + b2 i + c2 j + d2 k we get:
