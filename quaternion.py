@@ -3,16 +3,18 @@ import numpy
 
 def real_repr(q):
     a, b, c, d = get_parts(q)
-    a, b, c, d = a.transpose(1,0),\
-                 b.transpose(1,0),\
-                 c.transpose(1,0),\
-                 d.transpose(1,0)
+    
+    if all((len(i.shape) == 1) for i in [a, b, c, d]) == True:
+        a = a.view(1, 1)
+        b = b.view(1, 1)
+        c = c.view(1, 1)
+        d = d.view(1, 1)
 
     weight = torch.cat([torch.cat([a, -b, -c, -d], dim=1),
                         torch.cat([b,  a, -d,  c], dim=1),
                         torch.cat([c,  d,  a, -b], dim=1),
                         torch.cat([d, -c,  b,  a], dim=1)], dim=0)
-    return weight
+    return weight, a, b, c, d
 
 def get_parts(q):
 
@@ -23,48 +25,53 @@ def get_parts(q):
 
     return a, b, c, d
 
+def check_q_type(q):
+    if isinstance(q, (tuple, list)):
+        if all(isinstance(i, torch.Tensor) for i in q) == True:
+            q = torch.cat(q, 1)
+        else:
+            q = torch.Tensor(q)
+    return q
+
 class QuaternionTensor(torch.Tensor):
     
     @staticmethod 
-    def __new__(cls, q, real_repr_flag=True, *args, **kwargs):
-        q = real_repr(q)
+    def __new__(cls, q, real_tensor=True, *args, **kwargs):
+        
+        q = check_q_type(q)
+        if real_tensor:
+            q, cls.a, cls.b, cls.c, cls.d = real_repr(q)
+
         return super().__new__(cls, q, *args, **kwargs) 
 
-    def __init__(self, q, real_repr_flag=True):
+    def __init__(self, q, real_tensor=True):
         super().__init__()
-                
-        if isinstance(q, torch.Tensor):
-  
-            a, b, c, d = get_parts(q)
-                
-            self.a = a
-            self.b = b
-            self.c = c
-            self.d = d
-            
+        
+        self.real_tensor = real_tensor
+        q = check_q_type(q)
+        if real_tensor:
+            self.q, self.a, self.b, self.c, self.d = real_repr(q)
+        else:
+            self.a, self.b, self.c, self.d = get_parts(q)
+            self.q = q
 
-
-            
-        elif isinstance(q, (tuple, list, numpy.array)):
-            self.__class__(super().__init__(q))
-            
         self.grad = None
 
     @property
     def i_mul(self):
-        return self.__class__(torch.cat([self.a, self.b, -self.c, -self.d], 1))
+        return torch.cat([self.a, self.b, -self.c, -self.d], 1)
 
     @property
     def j_mul(self):
-        return self.__class__(torch.cat([self.a, -self.b, self.c, -self.d], 1))
+        return torch.cat([self.a, -self.b, self.c, -self.d], 1)
 
     @property
     def k_mul(self):
-        return self.__class__(torch.cat([self.a, -self.b, -self.c, self.d], 1))
+        return torch.cat([self.a, -self.b, -self.c, self.d], 1)
 
     @property
     def min(self):
-        return torch.min(self.q)
+        return torch.min(self)
 
     @property
     def sq_norm(self):
@@ -83,11 +90,11 @@ class QuaternionTensor(torch.Tensor):
     @property
     def T(self):
         zipped = torch.cat([self.a, self.b, self.c, self.d], 1)
-        return self.__class__(zipped)
+        return zipped
 
     @property
     def real_repr(self):   
-        return self.__class__(self._real_repr(), False)
+        return self._real_repr()
     
     @property
     def real_rot_repr(self):
@@ -101,18 +108,17 @@ class QuaternionTensor(torch.Tensor):
         row2 = torch.cat([torch.zeros_like(b), 1 - 2 * (c ** 2 + d ** 2), 2 * (b * c - d * a), 2 * (b * d + c * a)], 1)
         row3 = torch.cat([torch.zeros_like(b), 2 * (b * c + d * a), 1 - 2 * (b ** 2 + d ** 2), 2 * (c * d - b * a)], 1)
         row4 = torch.cat([torch.zeros_like(b), 2 * (b * d - c * a), 2 * (c * d + b * a), 1 - 2 * (b ** 2 + c ** 2)], 1)
-        weight = torch.cat([row1, row2, row3, row4], 0)
-        
-        return self.__class__(weight, False) 
+           
+        return torch.cat([row1, row2, row3, row4], 0)
     
     @property
     def v(self):
 
         if len(self.shape) > 1:
-            vec = self.__class__(torch.cat([torch.zeros_like(self.b), self.b, self.c, self.d], 1))
+            vec = torch.cat([torch.zeros_like(self.b), self.b, self.c, self.d], 1)
         else:
-            vec = self.__class__([0, self.b, self.c, self.d])
-        return vec
+            vec = [0, self.b, self.c, self.d]
+        return self.__class__(vec)
 
     @property
     def theta(self):
@@ -122,11 +128,11 @@ class QuaternionTensor(torch.Tensor):
     def conj(self):
 
         if len(self.shape) > 1:
-            con = self.__class__(torch.cat([self.a, -self.b, -self.c, -self.d], 1))
+            con = torch.cat([self.a, -self.b, -self.c, -self.d], 1)
         else:
-            con = self.__class__([self.a, -self.b, -self.c, -self.d])
+            con = [self.a, -self.b, -self.c, -self.d]
 
-        return con
+        return self.__class__(con)
 
     @property
     def norm(self):
@@ -137,29 +143,41 @@ class QuaternionTensor(torch.Tensor):
 
     def to(self, *args, **kwargs):
         
-        new_obj = QuaternionTensor([], self.extra_data)
+        new_obj = QuaternionTensor([], self.q)
         tempTensor = super().to(*args, **kwargs)
         new_obj.data = tempTensor.data
         new_obj.requires_grad = tempTensor.requires_grad
         
-        return(new_obj)
+        return new_obj 
     
 
     def exp(self):
         v = self.v
         a = self.a
+        print("ok")
         v_norm = v.norm
+        print("gyegye")
         exp = torch.clamp(torch.exp(a), 0, 1e10)
-
+        print("hsjshjwwh")
         real = exp * torch.cos(v_norm)
+        print("aAAAAAAAAAAAAAAAAAAAAH", self.shape)
+        
         if len(self.shape) > 1:
+            
+            print(exp)
+            print(v)
+            print(v/v_norm)
             vector = exp * (v / v_norm) * torch.sin(v_norm)
+            print("BJSBHSBSHBSH")
             out = real + vector
+            print("ksjss")
         else:
+            print("else")
             vector = exp * (v / v_norm) * torch.sin(v_norm)
+            print("print")
             out = [real, vector[1], vector[2], vector[3]]
 
-        return self.__class__(out)
+        return out
 
     def log(self):
         v = self.v
@@ -183,16 +201,15 @@ class QuaternionTensor(torch.Tensor):
 
     def __add__(self, other):
 
-        if isinstance(other, Quaternion):
-            out = self.q + other.q
 
-        elif isinstance(other, (int, float)):
+        if isinstance(other, (int, float)):
             out = self.q + other
 
         elif isinstance(other, torch.Tensor):
             if sum(other.shape) in [0, 1]:
                 out = self.q + other
-            elif other.shape[1] * 4 == self.shape[1]:
+
+            elif other.shape[1] * 4 == self.shape[1] and isinstance(other, QuaternionTensor):
                 a = self.a + other
                 out = torch.cat([a, self.b, self.c, self.d], 1)
             elif other.shape == self.shape:
@@ -207,16 +224,13 @@ class QuaternionTensor(torch.Tensor):
 
     def __radd__(self, other):
 
-        if isinstance(other, Quaternion):
-            out = other.q + self.q
-
         if isinstance(other, (int, float)):
             out = other + self.q
 
         elif isinstance(other, torch.Tensor):
             if sum(other.shape) in [0, 1] or other.shape == self.shape:
                 out = other + self.q
-            elif other.shape[1] * 4 == self.shape[1]:
+            elif other.shape[1] * 4 == self.shape[1] and isinstance(other, QuaternionTensor):
                 a = other + self.a
                 out = torch.cat([a, self.b, self.c, self.d], 1)
             else:
@@ -228,21 +242,18 @@ class QuaternionTensor(torch.Tensor):
         return self.__class__(out)
 
     def __iadd__(self, other):
-        add = self + other
-        return self.__class__(add)
+        add = self.q + other
+        return add
 
     def __sub__(self, other):
 
-        if isinstance(other, Quaternion):
-            out = self - other.q
-
-        elif isinstance(other, (int, float)):
-            out = self - other
+        if isinstance(other, (int, float)):
+            out = self.q - other
 
         elif isinstance(other, torch.Tensor):
             if sum(other.shape) in [0, 1] or other.shape == self.shape:
                 out = self.q - other
-            elif other.shape[1] * 4 == self.shape[1]:
+            elif other.shape[1] * 4 == self.shape[1] and isinstance(other, QuaternionTensor):
                 a = self.a - other
                 out = torch.cat([a, self.b, self.c, self.d], 1)
             else:
@@ -255,13 +266,10 @@ class QuaternionTensor(torch.Tensor):
 
     def __rsub__(self, other):
 
-        if isinstance(other, (int, float)):
-            out = other - self.q
-
-        elif isinstance(other, torch.Tensor):
+        if isinstance(other, torch.Tensor):
             if sum(other.shape) in [0, 1] or other.shape == self.shape:
                 out = other - self.q
-            elif other.shape[1] * 4 == self.shape[1]:
+            elif other.shape[1] * 4 == self.shape[1] and isinstance(other, QuaternionTensor):
                 a = other - self.a
                 out = torch.cat([a, self.b, self.c, self.d], 1)
             else:
@@ -274,13 +282,13 @@ class QuaternionTensor(torch.Tensor):
 
     def __isub__(self, other):
         sub = self - other
-        self.q = sub.q
+        self = sub.q
         self.a, self.b, self.c, self.d = sub.chunk()
         return self
 
     def __mul__(self, other):
         """
-        Product of two quaternions, called "Hamilton product".
+        Product of two quaternions, called "Hailton product".
         Using the basis product's rules and the distributive rule 
         for two quaternions b1 = a1 + b1 i + c1 j + d1 k and
         c1 = a2 + b2 i + c2 j + d2 k we get:
@@ -291,7 +299,7 @@ class QuaternionTensor(torch.Tensor):
         d_new = (a1 * d2 + b1 * c2 - c1 * b2 + d1 * a2) k
         """
 
-        if isinstance(other, Quaternion):
+        if isinstance(other, QuaternionTensor):
             a2, b2, c2, d2 = other.chunk()
 
             r = self.a * a2 - self.b * b2 - self.c * c2 - self.d * d2
@@ -304,13 +312,13 @@ class QuaternionTensor(torch.Tensor):
             else:
                 out = [r, i, j, k]
 
-        elif isinstance(other, (int, float)):
+        if isinstance(other, (int, float)):
             out = self.q * other
 
         elif isinstance(other, torch.Tensor):
             if sum(other.shape) in [0, 1] or other.shape == self.shape:
                 out = other * self.q
-            elif other.shape[1] * 4 == self.shape[1]:
+            elif other.shape[1] * 4 == self.shape[1] and isinstance(other, QuaternionTensor):
                 out = torch.cat([other]*4, 1) * self.q
             else:
                 raise ValueError("cannot broadcast shapes")
@@ -329,7 +337,7 @@ class QuaternionTensor(torch.Tensor):
         elif isinstance(other, torch.Tensor):
             if sum(other.shape) in [0, 1] or other.shape == self.shape:
                 out = other * self.q
-            elif other.shape[1] * 4 == self.shape[1]:
+            elif other.shape[1] * 4 == self.shape[1] and isinstance(other, QuaternionTensor):
                 out = torch.cat([other]*4, 1) * self.q
             else:
                 raise ValueError("cannot broadcast shapes")
@@ -341,34 +349,31 @@ class QuaternionTensor(torch.Tensor):
 
     def __imul__(self, other):
         mul = self * other
-        self.q = mul.q
+        self = mul.q
         self.a, self.b, self.c, self.d = mul.chunk()
         return self
 
     def __truediv__(self, other):
 
-        if isinstance(other, Quaternion):
-            out = self * other.inv
-
-        elif isinstance(other, (int, float)):
+        if isinstance(other, (int, float)):
             out = self.q / other
 
         elif isinstance(other, torch.Tensor):
-            if sum(other.shape) in [0, 1] or other.shape == self.shape:
+            if sum(other.shape) in [0, 1] or other.shape == self.q.shape:
                 out = self.q / other
-            elif other.shape[1] * 4 == self.shape[1]:
+            elif other.shape[1] * 4 == self.shape[1] and isinstance(other, QuaternionTensor):
                 out = self.q / torch.cat([other]*4)
             else:
                 raise ValueError("cannot broadcast shapes")
-            out = self.__class__(out)
+            out = out
         else:
             raise ValueError()
 
-        return out
+        return self.__class__(out)
 
     def __rtruediv__(self, other):
 
-        if isinstance(other, Quaternion):
+        if isinstance(other, QuaternionTensor):
             out = other * self.inv
 
         elif isinstance(other, (int, float)):
@@ -381,16 +386,16 @@ class QuaternionTensor(torch.Tensor):
                 out = torch.cat([other]*4, 1) / self.q
             else:
                 raise ValueError("cannot broadcast shapes")
-            out = self.__class__(out)
+            out = out
 
         else:
             raise ValueError()
 
-        return out
+        return self.__class__(out)
 
     def __itruediv__(self, other):
-        div = self / other
-        self.q = div.q
+        div = self.q / other
+        self = div.q
         self.a, self.b, self.c, self.d = div.chunk()
         return self
 
@@ -408,4 +413,4 @@ class QuaternionTensor(torch.Tensor):
             out.a += torch.cos(n * self.theta)
             out *= (self.norm ** n)
 
-        return out
+        return self.__class__(out)
