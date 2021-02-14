@@ -2,10 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from functions import *
-from quaternion import Quaternion
+from quaternion import QuaternionTensor
 from torch.nn import init
 
-Q = Quaternion
+Q = QuaternionTensor
 
 
 #########################################################################################
@@ -57,9 +57,9 @@ class QConv1d(nn.Module):
                               kernel_size=self.kernel_size)
 
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
         else:
-            self.weight = nn.Parameter(quaternion_weight.real_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight._real_repr)
         
         if self.bias:
             bias = torch.zeros(self.out_channels)
@@ -115,9 +115,9 @@ class QConv2d(nn.Module):
                               kernel_size=self.kernel_size)
         
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
         else:
-            self.weight = nn.Parameter(quaternion_weight.real_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight._real_repr)
 
         if self.bias:
             bias = torch.zeros(self.out_channels)
@@ -172,9 +172,9 @@ class QConv3d(nn.Module):
                               kernel_size=self.kernel_size)
 
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
         else:
-            self.weight = nn.Parameter(quaternion_weight.real_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight._real_repr)
 
         if self.bias:
             bias = torch.zeros(self.out_channels)
@@ -212,9 +212,9 @@ class QLinear(nn.Module):
         quaternion_weight = initialize_linear(self.in_channels, self.out_channels)
 
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
         else:
-            self.weight = nn.Parameter(quaternion_weight.real_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight._real_repr)
 
         if self.bias:
             bias = torch.zeros(self.out_channels)
@@ -225,130 +225,6 @@ class QLinear(nn.Module):
     def forward(self, x):
 
         return F.linear(x, self.weight, self.bias)
-
-
-# please refer to https://github.com/ChihebTrabelsi/deep_complex_networks for
-# the N X N whitening
-class QBatchNorm2d(nn.Module):
-    """
-    Quaternion batch normalization 2d
-    """
-
-    def __init__(self,
-                 in_channels,
-                 affine=True,
-                 training=True,
-                 eps=1e-5,
-                 momentum=0.9,
-                 track_running_stats=True):
-        """
-        @type in_channels: int
-        @type affine: bool
-        @type training: bool
-        @type eps: float
-        @type momentum: float
-        @type track_running_stats: bool
-        """
-        super(QBatchNorm2d, self).__init__()
-
-        assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
-        self.in_channels = in_channels
-
-        self.affine = affine
-        self.training = training
-        self.register_buffer("I", torch.Tensor([1]))
-        self.track_running_stats = track_running_stats
-        
-        self.register_buffer('eye', torch.diag(torch.cat([torch.Tensor([eps])]*4)).unsqueeze(0))
-        
-        if self.affine:
-            self.weight = torch.nn.Parameter(torch.zeros(4, 4, in_channels // 4))
-            self.bias = torch.nn.Parameter(torch.zeros(4, in_channels // 4))
-        else:
-            self.register_parameter('weight', None)
-            self.register_parameter('bias', None)
-
-        if self.track_running_stats:
-            self.register_buffer('running_mean', torch.zeros(4, in_channels // 4))
-            self.register_buffer('running_invsq_cov', torch.zeros(in_channels // 4, 4, 4))
-        else:
-            self.register_parameter('running_mean', None)
-            self.register_parameter('running_invsq_cov', None)
-        
-        self.momentum = momentum
-
-        self.reset_parameters()
-
-    def reset_running_stats(self):
-        if self.track_running_stats:
-            self.running_mean.zero_()
-            self.running_invsq_cov[: ,0, 0].fill_(1)
-            self.running_invsq_cov[: ,1, 1].fill_(1)
-            self.running_invsq_cov[: ,2, 2].fill_(1)
-            self.running_invsq_cov[: ,3, 3].fill_(1)
-
-    def reset_parameters(self):
-        self.reset_running_stats()
-        if self.affine:
-            init.ones_(self.weight[0, 0])
-            init.ones_(self.weight[1, 1])
-            init.ones_(self.weight[2, 2])
-            init.ones_(self.weight[3, 3])
-            init.zeros_(self.bias)
-
-    def forward(self, x):
-        assert self.in_channels == x.size(1), "channels should be the same"
-        x = torch.stack(torch.chunk(x, 4, 1), 1).permute(1, 0, 2, 3, 4)
-        axes, d = (1, *range(3, x.dim())), x.shape[0]
-        shape = 1, x.shape[2], *([1] * (x.dim() - 3))
-
-        if self.training:
-            mean = x.mean(dim=axes)
-            if self.running_mean is not None:
-                with torch.no_grad():
-                    self.running_mean = self.momentum * self.running_mean +\
-                                        (1.0 - self.momentum) * mean
-        else:
-            mean = self.running_mean
-        x = x - mean.reshape(d, *shape)
-
-        if self.training:
-            perm = x.permute(2, 0, *axes).flatten(2, -1)
-            cov = torch.matmul(perm, perm.transpose(-1, -2)) / perm.shape[-1]
-            ell = torch.cholesky(cov + self.eye, upper=True)
-
-            
-            if self.running_invsq_cov is not None:
-                with torch.no_grad():
-                    self.running_invsq_cov = self.momentum * self.running_invsq_cov +\
-                                             (1.0 - self.momentum) * ell
-
-        else:
-            invsq_cov = self.running_invsq_cov
-
-        soln = torch.triangular_solve(
-            x.unsqueeze(-1).permute(*range(1, x.dim()), 0, -1),
-            ell.reshape(*shape, d, d)
-        )
-
-        invsq_cov = soln.solution.squeeze(-1)
-        z = torch.stack(torch.unbind(invsq_cov, dim=-1), dim=0)
-
-        if self.affine:
-            shape = 1, z.shape[2], *([1] * (x.dim() - 3))
-
-            weight = self.weight.reshape(4, 4, *shape)
-            scaled = torch.stack([
-                z[0] * weight[0, 0] + z[1] * weight[0, 1] + z[2] * weight[0, 2] + z[3] * weight[0, 3],
-                z[0] * weight[1, 0] + z[1] * weight[1, 1] + z[2] * weight[1, 2] + z[3] * weight[1, 3],
-                z[0] * weight[2, 0] + z[1] * weight[2, 1] + z[2] * weight[2, 2] + z[3] * weight[2, 3],
-                z[0] * weight[3, 0] + z[1] * weight[3, 1] + z[2] * weight[3, 2] + z[3] * weight[3, 3],
-            ], dim=0)
-            z = scaled + self.bias.reshape(4, *shape)
-
-        z = torch.cat(torch.chunk(z, 4, 0), 2).squeeze()
-
-        return z
 
 
 class QConvTranspose1d(nn.Module):
@@ -395,9 +271,9 @@ class QConvTranspose1d(nn.Module):
                               kernel_size=self.kernel_size)
         
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
         else:
-            self.weight = nn.Parameter(quaternion_weight.real_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight._real_repr)
 
         if self.bias:
             bias = torch.zeros(self.out_channels)
@@ -456,9 +332,9 @@ class QConvTranspose2d(nn.Module):
                               kernel_size=self.kernel_size)
         
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
         else:
-            self.weight = nn.Parameter(quaternion_weight.real_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight._real_repr)
 
         if self.bias:
             bias = torch.zeros(self.out_channels)
@@ -515,9 +391,9 @@ class QConvTranspose3d(nn.Module):
                               kernel_size=self.kernel_size)
         
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
         else:
-            self.weight = nn.Parameter(quaternion_weight.real_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight._real_repr)
             
         if self.bias:
             bias = torch.zeros(self.out_channels)
@@ -553,7 +429,123 @@ class QMaxPool2d(nn.Module):
         output = flat.gather(dim=2, index=idx.flatten(start_dim=2)).view_as(idx)
 
         return output
+
     
+class QBatchNorm2d(nn.Module):
+    """
+    Quaternion batch normalization 2d
+    """
+
+    def __init__(self,
+                 in_channels,
+                 affine=True,
+                 training=True,
+                 eps=1e-5,
+                 momentum=0.9,
+                 track_running_stats=True):
+        """
+        @type in_channels: int
+        @type affine: bool
+        @type training: bool
+        @type eps: float
+        @type momentum: float
+        @type track_running_stats: bool
+        """
+        super(QBatchNorm2d, self).__init__()
+
+        assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
+        self.in_channels = in_channels
+
+        self.affine = affine
+        self.training = training
+        self.register_buffer("I", torch.Tensor([1]))
+        self.track_running_stats = track_running_stats
+        
+        self.register_buffer('eye', torch.diag(torch.cat([torch.Tensor([eps])]*4)).unsqueeze(0))
+        
+        if self.affine:
+            self.weight = torch.nn.Parameter(torch.zeros(4, 4, in_channels // 4))
+            self.bias = torch.nn.Parameter(torch.zeros(4, in_channels // 4))
+        else:
+            self.register_parameter('weight', None)
+            self.register_parameter('bias', None)
+
+        if self.track_running_stats:
+            self.register_buffer('running_mean', torch.zeros(4, in_channels // 4))
+            self.register_buffer('running_invsq_cov', torch.zeros(in_channels // 4, 4, 4))
+        else:
+            self.register_parameter('running_mean', None)
+            self.register_parameter('running_invsq_cov', None)
+        
+        self.momentum = momentum
+
+        self.reset_parameters()
+
+    def reset_running_stats(self):
+        if self.track_running_stats:
+            self.running_mean.zero_()
+            self.running_invsq_cov.zero_()
+
+    def reset_parameters(self):
+        self.reset_running_stats()
+        if self.affine:
+            init.constant_(self.weight[0, 0], 0.5)
+            init.constant_(self.weight[1, 1], 0.5)
+            init.constant_(self.weight[2, 2], 0.5)
+            init.constant_(self.weight[3, 3], 0.5)
+
+    def forward(self, x):
+        assert self.in_channels == x.size(1), "channels should be the same"
+        x = torch.stack(torch.chunk(x, 4, 1), 1).permute(1, 0, 2, 3, 4)
+        axes, d = (1, *range(3, x.dim())), x.shape[0]
+        shape = 1, x.shape[2], *([1] * (x.dim() - 3))
+
+        if self.training:
+            mean = x.mean(dim=axes)
+            if self.running_mean is not None:
+                with torch.no_grad():
+                    self.running_mean = self.momentum * self.running_mean +\
+                                        (1.0 - self.momentum) * mean
+        else:
+            mean = self.running_mean
+        
+        x = x - mean.reshape(d, *shape)
+
+        if self.training:
+            perm = x.permute(2, 0, *axes).flatten(2, -1)
+            cov = torch.matmul(perm, perm.transpose(-1, -2)) / perm.shape[-1]
+            ell = torch.cholesky(cov + self.eye, upper=True)
+
+            
+            if self.running_invsq_cov is not None:
+                with torch.no_grad():
+                    self.running_invsq_cov = self.momentum * self.running_invsq_cov +\
+                                             (1.0 - self.momentum) * ell
+
+        else:
+            invsq_cov = self.running_invsq_cov
+
+        soln = torch.triangular_solve(
+            x.unsqueeze(-1).permute(*range(1, x.dim()), 0, -1),
+            ell.reshape(*shape, d, d)
+        )
+
+        invsq_cov = soln.solution.squeeze(-1)
+        z = torch.stack(torch.unbind(invsq_cov, dim=-1), dim=0)
+        if self.affine:
+            weight = self.weight.view(4, 4, *shape)
+            scaled = torch.stack([
+                z[0] * weight[0, 0] + z[1] * weight[0, 1] + z[2] * weight[0, 2] + z[3] * weight[0, 3],
+                z[0] * weight[1, 0] + z[1] * weight[1, 1] + z[2] * weight[1, 2] + z[3] * weight[1, 3],
+                z[0] * weight[2, 0] + z[1] * weight[2, 1] + z[2] * weight[2, 2] + z[3] * weight[2, 3],
+                z[0] * weight[3, 0] + z[1] * weight[3, 1] + z[2] * weight[3, 2] + z[3] * weight[3, 3],
+            ], dim=0)
+            z = scaled + self.bias.reshape(4, *shape)
+
+        z = torch.cat(torch.chunk(z, 4, 0), 2).squeeze()
+
+        return z
+
     
 #########################################################################################
 #                                                                                       #
@@ -604,9 +596,9 @@ class QAutogradConv1d(nn.Module):
                               kernel_size=self.kernel_size)
         
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
         else:
-            self.weight = nn.Parameter(quaternion_weight.real_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight._real_repr)
 
         if self.bias:
             bias = torch.zeros(self.out_channels)
@@ -663,9 +655,9 @@ class QAutogradConv2d(nn.Module):
                               kernel_size=self.kernel_size)
         
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
         else:
-            self.weight = nn.Parameter(quaternion_weight.real_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight._real_repr)
 
         if self.bias:
             bias = torch.zeros(self.out_channels)
@@ -721,9 +713,9 @@ class QAutogradConv3d(nn.Module):
                               kernel_size=self.kernel_size)
         
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
         else:
-            self.weight = nn.Parameter(quaternion_weight.real_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight._real_repr)
 
         if self.bias:
             bias = torch.zeros(self.out_channels)
@@ -762,9 +754,9 @@ class QAutogradLinear(nn.Module):
         quaternion_weight = initialize_linear(self.in_channels, self.out_channels)
 
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
         else:
-            self.weight = nn.Parameter(quaternion_weight.real_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight._real_repr)
 
         if self.bias:
             bias = torch.zeros(self.out_channels)
@@ -822,9 +814,9 @@ class QAutogradConvTranspose1d(nn.Module):
                               kernel_size=self.kernel_size)
         
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
         else:
-            self.weight = nn.Parameter(quaternion_weight.real_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight._real_repr)
 
         if self.bias:
             bias = torch.zeros(self.out_channels)
@@ -883,9 +875,9 @@ class QAutogradConvTranspose2d(nn.Module):
                               kernel_size=self.kernel_size)
         
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
         else:
-            self.weight = nn.Parameter(quaternion_weight.real_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight._real_repr)
 
         if self.bias:
             bias = torch.zeros(self.out_channels)
@@ -945,9 +937,9 @@ class QAutogradConvTranspose3d(nn.Module):
                               kernel_size=self.kernel_size)
         
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
         else:
-            self.weight = nn.Parameter(quaternion_weight.real_repr.torch())
+            self.weight = nn.Parameter(quaternion_weight._real_repr)
 
         if self.bias:
             bias = torch.zeros(self.out_channels)
