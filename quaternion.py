@@ -97,8 +97,9 @@ class QuaternionTensor(torch.Tensor):
         return zipped
 
     @property
-    def real_repr(self):   
-        return self._real_repr()
+    def _real_repr(self):
+        q, _, _, _, _ = real_repr(self.q)
+        return q
     
     @property
     def real_rot_repr(self):
