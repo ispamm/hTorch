@@ -3,11 +3,11 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from math import factorial
-from quaternion import Quaternion
+from quaternion import QuaternionTensor
 import math
 from copy import copy
 
-Q = Quaternion
+Q = QuaternionTensor
 
 def initialize_linear(in_channels, out_channels, init_mode="he"):
     """
@@ -84,13 +84,13 @@ def initialize_conv(in_channels, out_channels, kernel_size=[2, 2], init_mode="he
     mat /= torch.cat([mat.norm]*4, 1)
     
     phase = torch.Tensor(*size_real).uniform_(-np.pi, np.pi)
-    magnitude = torch.from_numpy(chi.rvs(4, loc=0, scale=scale, size=size_real))
+    magnitude = torch.from_numpy(chi.rvs(4, loc=0, scale=scale, size=size_real)).float()
 
     r = magnitude * torch.cos(phase)
     factor = magnitude * torch.sin(phase)
     
     mat *= torch.cat([factor]*4, 1)
-    mat += r.float()
+    mat += r
 
     return mat
        
