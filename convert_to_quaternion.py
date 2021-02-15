@@ -55,9 +55,9 @@ def convert_to_quaternion(Net, spinor=False):
             quaternion_weight = initialize_linear(in_features, out_features)
             
             if spinor:
-                weight = quaternion_weight.real_rot_repr
+                weight = quaternion_weight._real_rot_repr
             else:
-                weight = quaternion_weight.real_repr
+                weight = quaternion_weight._real_repr
             
             getattr(Net, name).weight = nn.Parameter(weight)
             
@@ -77,9 +77,9 @@ def convert_to_quaternion(Net, spinor=False):
             quaternion_weight = initialize_conv(in_features, out_features, kernel_size)
             
             if spinor:
-                weight = get_rot_matrix(r, i, j, k)
+                weight = quaternion_weight._real_rot_repr
             else:
-                weight = quaternion_weight.real_repr
+                weight = quaternion_weight._real_repr
             
             getattr(Net, name).weight = nn.Parameter(weight)
             
