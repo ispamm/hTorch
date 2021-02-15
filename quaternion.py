@@ -228,6 +228,7 @@ class QuaternionTensor(torch.Tensor):
         real_tensor = False
         
         if len(other.shape) > 1 and other.shape[1] * 4 == self.shape[1]:
+            warnings.warn('Considering the N x C//4 x [...] tensor as a real (a + 0i + 0j + 0k) quaternion')
             a = self.a + other
             out = torch.cat([a, self.b, self.c, self.d], 1)
             real_tensor = True
@@ -258,6 +259,7 @@ class QuaternionTensor(torch.Tensor):
         real_tensor = False
         
         if len(other.shape) > 1 and other.shape[1] * 4 == self.shape[1]:
+            warnings.warn('Considering the N x C//4 x [...] tensor as a real (a + 0i + 0j + 0k) quaternion')
             a = self.a - other
             out = torch.cat([a, self.b, self.c, self.d], 1)
             real_tensor = True
@@ -310,6 +312,7 @@ class QuaternionTensor(torch.Tensor):
                 out = [r, i, j, k]
                 
         elif len(other.shape) > 1 and other.shape[1] * 4 == self.shape[1]:
+            warnings.warn('Considering the N x C//4 x [...] tensor as a real (a + 0i + 0j + 0k) quaternion')
             out = torch.cat([other]*4, 1) * self.q
             real_tensor = True
         else:
@@ -341,6 +344,7 @@ class QuaternionTensor(torch.Tensor):
             out = self * other.inv
         
         elif len(other.shape) > 1 and other.shape[1] * 4 == self.shape[1]:
+            warnings.warn('Considering the N x C//4 x [...] tensor as a real (a + 0i + 0j + 0k) quaternion')
             out = self.q / torch.cat([other.q]*4)
             real_tensor = True
         else:
