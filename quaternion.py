@@ -472,7 +472,6 @@ class QuaternionTensor(torch.Tensor):
         
         elif isinstance(other, torch.Tensor):
             if len(other.shape) > 1 and len(self.shape) > 1:
-                print(other.shape)
                 if other.shape[1] * 4 == self.shape[1]:
                     warnings.warn('Considering the N x C//4 x [...] tensor as a real (a + 0i + 0j + 0k) quaternion')
                     out = self.q / torch.cat([other]*4, 1)
