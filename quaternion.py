@@ -3,7 +3,11 @@ import numpy as np
 import warnings
 
 def get_parts(q):
-
+    """
+    Divides input tensor in real and imaginary parts.
+    
+    @type q: torch.Tensor
+    """
     if len(q.shape) == 1:
         a, b, c, d = torch.chunk(q, 4, 0)
     else:
@@ -12,6 +16,12 @@ def get_parts(q):
     return a, b, c, d
 
 def check_q_type(q):
+    """
+    Readies the tensor for the QuaternionTensor class
+    formatting it in a manageable way.
+    
+    @type q: torch.Tensor/list/tuple
+    """
     if isinstance(q, (tuple, list)):
         if all(isinstance(i, torch.Tensor) for i in q) == True:
             if all(len(i.shape) == 1 for i in q):
@@ -23,6 +33,11 @@ def check_q_type(q):
     return q
 
 def real_repr(q):
+    """
+    Gets the real representation of the tensor.
+    
+    @type q: torch.Tensor
+    """
     a, b, c, d = get_parts(q)
     
     if all((len(i.shape) == 1) for i in [a, b, c, d]) == True:
@@ -43,7 +58,11 @@ def real_repr(q):
     return weight, a, b, c, d
 
 def real_rot_repr(q):
-
+    """
+    Gets the real rotation representation of the tensor.
+    
+    @type q: torch.Tensor
+    """
     a, b, c, d = get_parts(q)
     
     if all((len(i.shape) == 1) for i in [a, b, c, d]) == True:
@@ -77,6 +96,13 @@ def real_rot_repr(q):
 
 
 class QuaternionTensor(torch.Tensor):
+    """
+    The class contains the common quaternion operations suited
+    for the Pytorch framework subclassing its 
+    "torch.Tensor". Thus it can be fed in any
+    Pytorch function that accepts a torch.Tensor or can be
+    used independently for other, more general, applications.    
+    """
     
     @staticmethod 
     def __new__(cls, q, real_tensor=False, *args, **kwargs):
@@ -89,6 +115,14 @@ class QuaternionTensor(torch.Tensor):
 
     def __init__(self, q, real_tensor=False):
         super().__init__()
+        """
+        Init accepts incoming quaternion and immediately
+        transforms it into its real represention when 
+        "real_tensor" is set to True.
+        
+        @type q: torch.Tensor/list/tuple
+        @type real_tensor: bool
+        """
         
         self.real_tensor = real_tensor
         q = check_q_type(q)
@@ -102,27 +136,44 @@ class QuaternionTensor(torch.Tensor):
 
     @property
     def i_mul(self):
+        """
+        Quaternion multiplication by 0 + 1i + 0j + 0k.
+        """
         return torch.cat([self.a, self.b, -self.c, -self.d], 1)
 
     @property
     def j_mul(self):
+        """
+        Quaternion multiplication by 0 + 0i + 1j + 0k.
+        """
         return torch.cat([self.a, -self.b, self.c, -self.d], 1)
 
     @property
     def k_mul(self):
+        """
+        Quaternion multiplication by 0 + 0i + 0j + 1k.
+        """
         return torch.cat([self.a, -self.b, -self.c, self.d], 1)
 
     @property
     def min(self):
+        """
+        Minimum of quaternion.
+        """
         return torch.min(self)
 
     @property
     def sq_norm(self):
+        """
+        Quaternion squared norm.
+        """
         return self.a ** 2 + self.b ** 2 + self.c ** 2 + self.d ** 2
 
     @property
     def inv(self):
-
+        """
+        Quaternion inverse.
+        """
         if len(self.shape) > 1:
             inverse = self.conj / self.sq_norm
         else:
@@ -132,22 +183,33 @@ class QuaternionTensor(torch.Tensor):
     
     @property
     def T(self):
+        """
+        General transpose.
+        """
         zipped = torch.cat([self.a, self.b, self.c, self.d], 1)
         return zipped
 
     @property
     def _real_repr(self):
+        """
+        Real representation of the quaternion.
+        """
         q, _, _, _, _ = real_repr(self.q)
         return q
     
     @property
     def _real_rot_repr(self):
+        """
+        Real rotation representation.
+        """
         q, _, _, _, _ = real_rot_repr(self.q)
         return q
     
     @property
     def v(self):
-
+        """
+        Vector part of the quaternion: 0 + b*i + c*j + d*k. 
+        """
         if len(self.shape) > 1:
             vec = torch.cat([torch.zeros_like(self.b), self.b, self.c, self.d], 1)
         else:
@@ -156,11 +218,16 @@ class QuaternionTensor(torch.Tensor):
 
     @property
     def theta(self):
+        """
+        Angle of the quaternion.
+        """
         return torch.acos(self.a / self.norm)
 
     @property
     def conj(self):
-
+        """
+        Quaternion conjugate: a - b*i - c*j - d*k.
+        """
         if len(self.shape) > 1:
             con = torch.cat([self.a, -self.b, -self.c, -self.d], 1)
         else:
@@ -170,13 +237,21 @@ class QuaternionTensor(torch.Tensor):
 
     @property
     def norm(self):
+        """
+        Quaternion (non-squared) norm.
+        """
         return torch.sqrt(self.a ** 2 + self.b ** 2 + self.c ** 2 + self.d ** 2 + 1e-10)
     
     def clone(self, *args, **kwargs): 
+        """
+        General Pytorch cloning.
+        """
         return QuaternionTensor(super().clone(*args, **kwargs))
 
     def to(self, *args, **kwargs):
-        
+        """
+        Sends tensor to CPU or GPU.
+        """
         new_obj = QuaternionTensor([], self.q)
         tempTensor = super().to(*args, **kwargs)
         new_obj.data = tempTensor.data
@@ -186,6 +261,9 @@ class QuaternionTensor(torch.Tensor):
     
 
     def exp(self):
+        """
+        Quaternion exponential.
+        """
         v = self.v
         a = self.a
         v_norm = v.norm
@@ -201,6 +279,9 @@ class QuaternionTensor(torch.Tensor):
         return self.__class__(out, False)
 
     def log(self):
+        """
+        Quaternion logarithm.
+        """
         v = self.v
         a = self.a
         v_norm = v.norm
@@ -218,13 +299,19 @@ class QuaternionTensor(torch.Tensor):
         return self.__class__(out, False)
 
     def chunk(self):
+        """
+        Returns the single parts as torch.Tensor's.
+        """
         return torch.Tensor(self.a),\
                torch.Tensor(self.b),\
                torch.Tensor(self.c),\
                torch.Tensor(self.d)
                 
     def __add__(self, other):
-        
+        """
+        Standard addition but only adds the other tensor
+        to the real part if it has 1/4 of the channels.
+        """
         real_tensor = False
         
         if len(other.shape) > 1 and other.shape[1] * 4 == self.shape[1]:
@@ -255,7 +342,10 @@ class QuaternionTensor(torch.Tensor):
         return self.__class__(add.q, False)
 
     def __sub__(self, other):
-        
+        """
+        Standard difference but only subtracts the other tensor
+        to the real part if it has 1/4 of the channels.
+        """
         real_tensor = False
         
         if len(other.shape) > 1 and other.shape[1] * 4 == self.shape[1]:
@@ -289,13 +379,16 @@ class QuaternionTensor(torch.Tensor):
         """
         Product of two quaternions, called "Hamilton product".
         Using the basis product's rules and the distributive rule 
-        for two quaternions b1 = a1 + b1 i + c1 j + d1 k and
-        c1 = a2 + b2 i + c2 j + d2 k we get:
+        for two quaternions q1 = a1 + b1*i + c1*j + d1*k and
+        q2 = a2 + b2*i + c2*j + d2*k we get:
 
         a_new = a1 * a2 - b1 * b2 - c1 * c2 - d1 * d2
         b_new = (a1 * b2 + b1 * a2 + c1 * d2 - d1 * c2) i
         c_new = (a1 * c2 - b1 * d2 + c1 * a2 + d1 * b2) j
         d_new = (a1 * d2 + b1 * c2 - c1 * b2 + d1 * a2) k
+        
+        It broadcastes the other C/4 tensor to C channels
+        to compute the standard Kronecker product.
         """
         real_tensor = False
         
@@ -337,7 +430,11 @@ class QuaternionTensor(torch.Tensor):
         return self.__class__(mul.q, False)
 
     def __truediv__(self, other):
-            
+        """
+        Quaternion division q1 * (q2)^-1.
+        It broadcastes the other C/4 tensor to C channels
+        to compute the standard elementwise division.
+        """
         real_tensor = True
             
         if isinstance(other, QuaternionTensor):
@@ -369,6 +466,9 @@ class QuaternionTensor(torch.Tensor):
         return self.__class__(div.q, False)
 
     def __pow__(self, n):
+        """
+        Quaternion power.
+        """
         n = float(n)
         v = self.v
 
