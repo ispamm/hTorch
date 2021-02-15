@@ -57,7 +57,7 @@ class QConv1d(nn.Module):
                               kernel_size=self.kernel_size)
 
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
+            self.weight = nn.Parameter(quaternion_weight._real_rot_repr)
         else:
             self.weight = nn.Parameter(quaternion_weight._real_repr)
         
@@ -115,7 +115,7 @@ class QConv2d(nn.Module):
                               kernel_size=self.kernel_size)
         
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
+            self.weight = nn.Parameter(quaternion_weight._real_rot_repr)
         else:
             self.weight = nn.Parameter(quaternion_weight._real_repr)
 
@@ -172,7 +172,7 @@ class QConv3d(nn.Module):
                               kernel_size=self.kernel_size)
 
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
+            self.weight = nn.Parameter(quaternion_weight._real_rot_repr)
         else:
             self.weight = nn.Parameter(quaternion_weight._real_repr)
 
@@ -212,7 +212,7 @@ class QLinear(nn.Module):
         quaternion_weight = initialize_linear(self.in_channels, self.out_channels)
 
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
+            self.weight = nn.Parameter(quaternion_weight._real_rot_repr)
         else:
             self.weight = nn.Parameter(quaternion_weight._real_repr)
 
@@ -271,7 +271,7 @@ class QConvTranspose1d(nn.Module):
                               kernel_size=self.kernel_size)
         
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
+            self.weight = nn.Parameter(quaternion_weight._real_rot_repr)
         else:
             self.weight = nn.Parameter(quaternion_weight._real_repr)
 
@@ -332,7 +332,7 @@ class QConvTranspose2d(nn.Module):
                               kernel_size=self.kernel_size)
         
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
+            self.weight = nn.Parameter(quaternion_weight._real_rot_repr)
         else:
             self.weight = nn.Parameter(quaternion_weight._real_repr)
 
@@ -391,7 +391,7 @@ class QConvTranspose3d(nn.Module):
                               kernel_size=self.kernel_size)
         
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
+            self.weight = nn.Parameter(quaternion_weight._real_rot_repr)
         else:
             self.weight = nn.Parameter(quaternion_weight._real_repr)
             
@@ -458,9 +458,7 @@ class QBatchNorm2d(nn.Module):
 
         self.affine = affine
         self.training = training
-        self.register_buffer("I", torch.Tensor([1]))
         self.track_running_stats = track_running_stats
-        
         self.register_buffer('eye', torch.diag(torch.cat([torch.Tensor([eps])]*4)).unsqueeze(0))
         
         if self.affine:
@@ -596,7 +594,7 @@ class QAutogradConv1d(nn.Module):
                               kernel_size=self.kernel_size)
         
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
+            self.weight = nn.Parameter(quaternion_weight._real_rot_repr)
         else:
             self.weight = nn.Parameter(quaternion_weight._real_repr)
 
@@ -655,7 +653,7 @@ class QAutogradConv2d(nn.Module):
                               kernel_size=self.kernel_size)
         
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
+            self.weight = nn.Parameter(quaternion_weight._real_rot_repr)
         else:
             self.weight = nn.Parameter(quaternion_weight._real_repr)
 
@@ -713,7 +711,7 @@ class QAutogradConv3d(nn.Module):
                               kernel_size=self.kernel_size)
         
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
+            self.weight = nn.Parameter(quaternion_weight._real_rot_repr)
         else:
             self.weight = nn.Parameter(quaternion_weight._real_repr)
 
@@ -754,7 +752,7 @@ class QAutogradLinear(nn.Module):
         quaternion_weight = initialize_linear(self.in_channels, self.out_channels)
 
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
+            self.weight = nn.Parameter(quaternion_weight._real_rot_repr)
         else:
             self.weight = nn.Parameter(quaternion_weight._real_repr)
 
@@ -814,7 +812,7 @@ class QAutogradConvTranspose1d(nn.Module):
                               kernel_size=self.kernel_size)
         
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
+            self.weight = nn.Parameter(quaternion_weight._real_rot_repr)
         else:
             self.weight = nn.Parameter(quaternion_weight._real_repr)
 
@@ -875,7 +873,7 @@ class QAutogradConvTranspose2d(nn.Module):
                               kernel_size=self.kernel_size)
         
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
+            self.weight = nn.Parameter(quaternion_weight._real_rot_repr)
         else:
             self.weight = nn.Parameter(quaternion_weight._real_repr)
 
@@ -937,7 +935,7 @@ class QAutogradConvTranspose3d(nn.Module):
                               kernel_size=self.kernel_size)
         
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight.real_rot_repr)
+            self.weight = nn.Parameter(quaternion_weight._real_rot_repr)
         else:
             self.weight = nn.Parameter(quaternion_weight._real_repr)
 
