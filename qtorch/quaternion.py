@@ -556,6 +556,10 @@ class QuaternionTensor(torch.Tensor):
 
         return self.__class__(out, False)
     
+    def __str__(self):
+        return str(self.q)
+        
+    
     def __repr__(self):
         return f"real part: {self.a}\n" +\
                f"imaginary part (i): {self.b}\n" +\
