@@ -1,1 +1,6 @@
 __pycache__/*.pyc
+*/__pycache__/*.pyc
+.vscode/*
+build/*
+dist/*
+qtorch_giorgiozannini.egg-info/*
