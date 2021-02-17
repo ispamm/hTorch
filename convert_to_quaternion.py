@@ -6,15 +6,7 @@ import re
 import sys
 from functions import *
 
-def to_conj(weight):
-    """
-    applies conjugation to an incoming weight matrix
-    
-    @type weight: torch.Tensor
-    """
-    r, i, j, k = torch.chunk(weight, 4, 0)
-    return 4*torch.cat([r, -i, -j, -k], 0)
-
+# does not find an application yet
 def apply_quaternion_gradient(model, layers):
     """
     hooks real-valued gradients and transforms them into one for 
@@ -86,6 +78,5 @@ def convert_to_quaternion(Net, spinor=False):
             if getattr(Net, name).bias != None:
                 getattr(Net, name).bias.data.zero_()
     
-    # return apply_quaternion_gradient(Net, layers) does not seem to make sense for now
     return Net
                 

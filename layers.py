@@ -488,9 +488,9 @@ class QBatchNorm2d(nn.Module):
         self.reset_running_stats()
         if self.affine:
             init.constant_(self.weight[0, 0], 0.5)
-            init.constant_(self.weight[1, 1], 0.5)
-            init.constant_(self.weight[2, 2], 0.5)
-            init.constant_(self.weight[3, 3], 0.5)
+            init.constant_(self.weight[1, 1], )
+            init.constant_(self.weight[2, 2], 1)
+            init.constant_(self.weight[3, 3], 1)
 
     def forward(self, x):
         assert self.in_channels == x.size(1), "channels should be the same"
@@ -514,7 +514,6 @@ class QBatchNorm2d(nn.Module):
             cov = torch.matmul(perm, perm.transpose(-1, -2)) / perm.shape[-1]
             ell = torch.cholesky(cov + self.eye, upper=True)
 
-            
             if self.running_invsq_cov is not None:
                 with torch.no_grad():
                     self.running_invsq_cov = self.momentum * self.running_invsq_cov +\
@@ -530,6 +529,7 @@ class QBatchNorm2d(nn.Module):
 
         invsq_cov = soln.solution.squeeze(-1)
         z = torch.stack(torch.unbind(invsq_cov, dim=-1), dim=0)
+        
         if self.affine:
             weight = self.weight.view(4, 4, *shape)
             scaled = torch.stack([
@@ -541,6 +541,7 @@ class QBatchNorm2d(nn.Module):
             z = scaled + self.bias.reshape(4, *shape)
 
         z = torch.cat(torch.chunk(z, 4, 0), 2).squeeze()
+        print(torch.var(z))
 
         return z
 

@@ -35,17 +35,17 @@ def initialize_linear(in_channels, out_channels, init_mode="he"):
     size_img = [in_channels, out_channels * 3]
 
     img_mat = torch.Tensor(*size_img).uniform_(-1, 1)
-    mat = Q(torch.cat([torch.zeros(size_real), img_mat], 1))
+    mat = Q(torch.cat([torch.zeros(size_real), img_mat], 1), False)
     mat /= torch.cat([mat.norm]*4, 1)
     
     phase = torch.Tensor(*size_real).uniform_(-np.pi, np.pi)
-    magnitude = torch.from_numpy(chi.rvs(4, loc=0, scale=scale, size=size_real))
+    magnitude = torch.from_numpy(chi.rvs(4, loc=0, scale=scale, size=size_real)).float()
 
     r = magnitude * torch.cos(phase)
     factor = magnitude * torch.sin(phase)
     
     mat *= torch.cat([factor]*4, 1)
-    mat += r.float()
+    mat += torch.cat([r]*4, 1)
 
     return mat
 
@@ -80,7 +80,7 @@ def initialize_conv(in_channels, out_channels, kernel_size=[2, 2], init_mode="he
     size_img = [size_real[0]] + [size_real[1] * 3] + size_real[2:]
 
     img_mat = torch.Tensor(*size_img).uniform_(-1, 1)
-    mat = Q(torch.cat([torch.zeros(size_real), img_mat], 1))
+    mat = Q(torch.cat([torch.zeros(size_real), img_mat], 1), False)
     mat /= torch.cat([mat.norm]*4, 1)
     
     phase = torch.Tensor(*size_real).uniform_(-np.pi, np.pi)
@@ -90,11 +90,16 @@ def initialize_conv(in_channels, out_channels, kernel_size=[2, 2], init_mode="he
     factor = magnitude * torch.sin(phase)
     
     mat *= torch.cat([factor]*4, 1)
-    mat += r
-
+    mat += torch.cat([r]*4, 1)
+    
     return mat
        
-    
+###############################################  
+#                                             #
+# autograds yet to be efficiently implemented #
+#                                             #
+###############################################
+
 class QConvAutograd(torch.autograd.Function):
     
     @staticmethod
@@ -190,7 +195,7 @@ class QTransposeConvAutograd(torch.autograd.Function):
                 
         return grad_input_r, grad_input_bias
     
-    
+
 class QLinearAutograd(torch.autograd.Function):
     
     @staticmethod
