@@ -236,6 +236,7 @@ class QuaternionTensor(torch.Tensor):
         Quaternion (non-squared) norm.
         """
         return torch.sqrt(self.a ** 2 + self.b ** 2 + self.c ** 2 + self.d ** 2 + 1e-10)
+   
     
     def clone(self, *args, **kwargs): 
         """
@@ -319,7 +320,12 @@ class QuaternionTensor(torch.Tensor):
                 else:
                     out = self.q + other                    
             else:
-                out = self.q + other
+                if len(other.shape) == 1 and other.shape[0] == self.shape[0]:
+                    a = self.a + other
+                    out = torch.cat([a, self.b, self.c, self.d], 1)
+                    real_tensor = True
+                else:
+                    out = self.q + other
         else:
             out = self.q + other
 
@@ -338,7 +344,12 @@ class QuaternionTensor(torch.Tensor):
                 else:
                     out = other + self.q
             else:
-                out = other + self.q
+                if len(other.shape) == 1 and other.shape[0] == self.shape[0]:
+                    a = other + self.a
+                    out = torch.cat([a, self.b, self.c, self.d], 1)
+                    real_tensor = True
+                else:
+                    out = other + self.q
         else:
             out = other + self.q
         
@@ -365,7 +376,12 @@ class QuaternionTensor(torch.Tensor):
                 else:
                     out = self.q - other
             else:
-                out = self.q - other
+                if len(other.shape) == 1 and other.shape[0] == self.shape[0]:
+                    a = self.a - other
+                    out = torch.cat([a, self.b, self.c, self.d], 1)
+                    real_tensor = True
+                else:
+                    out = self.q - other
         else:
              out = self.q - other
                 
@@ -384,7 +400,12 @@ class QuaternionTensor(torch.Tensor):
                 else:
                     out = other - self.q
             else:
-                out = other - self.q
+                if len(other.shape) == 1 and other.shape[0] == self.shape[0]:
+                    a = other - self.a
+                    out = torch.cat([a, self.b, self.c, self.d], 1)
+                    real_tensor = True
+                else:
+                    out = other - self.q
         else:
             out = other - self.q
             
@@ -426,12 +447,14 @@ class QuaternionTensor(torch.Tensor):
             if len(other.shape) > 1 and len(self.shape) > 1:
                 if other.shape[1] * 4 == self.shape[1]:
                     warnings.warn('Considering the N x C//4 x [...] tensor as a real (a + 0i + 0j + 0k) quaternion')
-                    out = torch.cat([other]*4, 1) * self.q
-                    real_tensor = True
+                    out = self.q * torch.cat([other]*4, 1)
                 else:
                     out = self.q * other
             else:
-                out = self.q * other
+                if len(other.shape) == 1 and other.shape[0] == self.shape[0]:
+                    out = self.q * torch.cat([other.unsqueeze(1)]*4, 1)
+                else:
+                    out = self.q * other
         else:
             out = self.q * other
 
@@ -445,11 +468,13 @@ class QuaternionTensor(torch.Tensor):
             if len(other.shape) > 1 and len(self.shape) > 1:
                 if other.shape[1] * 4 == self.shape[1]:
                     out = torch.cat([other]*4, 1) * self.q
-                    real_tensor = True
                 else:
                     out = other * self.q
             else:
-                out = other * self.q
+                if len(other.shape) == 1 and other.shape[0] == self.shape[0]:
+                    out = torch.cat([other.unsqueeze(1)]*4, 1) * self.q
+                else:
+                    out = other * self.q
         else:
             out = other * self.q
             
@@ -475,11 +500,13 @@ class QuaternionTensor(torch.Tensor):
                 if other.shape[1] * 4 == self.shape[1]:
                     warnings.warn('Considering the N x C//4 x [...] tensor as a real (a + 0i + 0j + 0k) quaternion')
                     out = self.q / torch.cat([other]*4, 1)
-                    real_tensor = True
                 else:
                     out = self.q / other
             else:
-                out = self.q / other            
+                if len(other.shape) == 1 and other.shape[0] == self.shape[0]:
+                    out = self.q / torch.cat([other.unsqueeze(1)]*4, 1)
+                else:
+                    out = self.q / other          
         else:
             out = self.q / other  
             
@@ -497,7 +524,10 @@ class QuaternionTensor(torch.Tensor):
                 else:
                     out = other / self.q
             else:
-                out = other / self.q
+                if len(other.shape) == 1 and other.shape[0] == self.shape[0]:
+                    out = torch.cat([other.unsqueeze(1)]*4, 1) / self.q
+                else:
+                    out = other / self.q
         else:
             out = other / self.q
             
