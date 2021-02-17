@@ -9,10 +9,6 @@ that this work is inspired to.
 
 ![image](https://github.com/giorgiozannini/QNN/blob/main/image.png?raw=true)
 
-#TODO:
-- fix bn
-- qselu (?)
-- speed up code
 
 ## References
 <a id="1">[1]</a> 
