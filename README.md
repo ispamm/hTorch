@@ -14,7 +14,7 @@ that this work is inspired to.
 <a id="1">[1]</a> 
 Chase Gaudet, Anthony Maida (2018).
 Deep Quaternion Networks. 
-2018 International Joint Conference on Neural Networks (IJCNN)
+2018 International Joint Conference on Neural Networks (IJCNN).
 [link](https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=8489651&tag=1)
 
 <a id="2">[2]</a> 
