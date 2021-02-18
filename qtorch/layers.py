@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from functions import *
-from quaternion import QuaternionTensor
+from .functions import *
+from .quaternion import QuaternionTensor
 from torch.nn import init
 
 Q = QuaternionTensor
@@ -13,6 +13,30 @@ Q = QuaternionTensor
 #                                QUATERNION LAYERS                                      #
 #                                                                                       #
 #########################################################################################
+
+class QuaternionToReal(nn.Module):
+    """
+    Casts to real by its norm
+    """
+    
+    def __init__(self, in_channels):
+        super(QuaternionToReal, self).__init__()
+        
+        assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
+        self.in_channels = in_channels
+    
+    def forward(self, x, quat_format=False):
+        
+        if quat_format:
+            norm = x.norm
+            if len(norm.shape) == 1:
+                out = Q(torch.cat([norm,*[torch.zeros_like(norm)]*3], 0))
+            else:
+                out = Q(torch.cat([norm,*[torch.zeros_like(norm)]*3], 1))
+        else:
+            out = x.norm
+            
+        return out
 
 
 class QConv1d(nn.Module):
@@ -69,8 +93,8 @@ class QConv1d(nn.Module):
 
     def forward(self, x):
 
-        return F.conv1d(x, self.weight, self.bias, self.stride,
-                        self.padding, self.dilation, self.groups)
+        return Q(F.conv1d(x, self.weight, self.bias, self.stride,
+                        self.padding, self.dilation, self.groups))
 
 
     
@@ -126,8 +150,8 @@ class QConv2d(nn.Module):
             self.bias = None
 
     def forward(self, x):
-        return F.conv2d(x, self.weight, self.bias, self.stride,
-                                  self.padding, self.dilation, self.groups)
+        return Q(F.conv2d(x, self.weight, self.bias, self.stride,
+                                  self.padding, self.dilation, self.groups))
 
 
 class QConv3d(nn.Module):
@@ -184,8 +208,8 @@ class QConv3d(nn.Module):
 
     def forward(self, x):
 
-        return F.conv3d(x, self.weight, self.bias, self.stride,
-                        self.padding, self.dilation, self.groups)
+        return Q(F.conv3d(x, self.weight, self.bias, self.stride,
+                        self.padding, self.dilation, self.groups))
 
 
 class QLinear(nn.Module):
@@ -224,7 +248,7 @@ class QLinear(nn.Module):
 
     def forward(self, x):
 
-        return F.linear(x, self.weight, self.bias)
+        return Q(F.linear(x, self.weight, self.bias))
 
 
 class QConvTranspose1d(nn.Module):
@@ -283,8 +307,8 @@ class QConvTranspose1d(nn.Module):
 
     def forward(self, x):
 
-        return F.conv_transpose1d(x, self.weight, self.bias, self.stride,
-                                  self.padding, self.output_padding, self.groups, self.dilation)
+        return Q(F.conv_transpose1d(x, self.weight, self.bias, self.stride,
+                                  self.padding, self.output_padding, self.groups, self.dilation))
 
 
 
@@ -344,8 +368,8 @@ class QConvTranspose2d(nn.Module):
 
     def forward(self, x):
 
-        return F.conv_transpose2d(x, self.weight, self.bias, self.stride,
-                                  self.padding, self.output_padding, self.groups, self.dilation)
+        return Q(F.conv_transpose2d(x, self.weight, self.bias, self.stride,
+                                  self.padding, self.output_padding, self.groups, self.dilation))
 
 
 class QConvTranspose3d(nn.Module):
@@ -403,8 +427,8 @@ class QConvTranspose3d(nn.Module):
 
     def forward(self, x):
 
-        return F.conv_transpose3d(x, self.weight, self.bias, self.stride,
-                                  self.padding, self.output_padding, self.groups, self.dilation)
+        return Q(F.conv_transpose3d(x, self.weight, self.bias, self.stride,
+                                  self.padding, self.output_padding, self.groups, self.dilation))
 
 # reference https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=8632910
 class QMaxPool2d(nn.Module):
@@ -422,9 +446,8 @@ class QMaxPool2d(nn.Module):
         self.pool = nn.MaxPool2d(kernel_size, stride, padding, return_indices=True)
 
     def forward(self, x):
-        x = Q(x)
         c, idx = self.pool(x.norm)
-        idx = bcast(idx, n=4)
+        idx = torch.cat([idx]*4, 1)
         flat = x.flatten(start_dim=2)
         output = flat.gather(dim=2, index=idx.flatten(start_dim=2)).view_as(idx)
 
@@ -541,9 +564,8 @@ class QBatchNorm2d(nn.Module):
             z = scaled + self.bias.reshape(4, *shape)
 
         z = torch.cat(torch.chunk(z, 4, 0), 2).squeeze()
-        print(torch.var(z))
 
-        return z
+        return Q(z)
 
     
 #########################################################################################

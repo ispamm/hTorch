@@ -118,17 +118,27 @@ class QuaternionTensor(torch.Tensor):
             q = real_repr(q)
         
         if len(q.shape) == 1:
-            self.a, self.b, self.c, self.d = torch.chunk(q, 4, 0)
+            a, b, c, d = torch.chunk(q, 4, 0)
+            self.a = torch.Tensor(a)
+            self.b = torch.Tensor(b)
+            self.c = torch.Tensor(c)
+            self.d = torch.Tensor(d)
         else:
             a, b, c, d = get_parts(q)
-            self.a = a.transpose(1, 0)
-            self.b = b.transpose(1, 0)
-            self.c = c.transpose(1, 0)
-            self.d = d.transpose(1, 0)
+            self.a = torch.Tensor(a.transpose(1, 0))
+            self.b = torch.Tensor(b.transpose(1, 0))
+            self.c = torch.Tensor(c.transpose(1, 0))
+            self.d = torch.Tensor(d.transpose(1, 0))
         
         self.q = q
         self.grad = None
-
+    
+    def torch(self):
+        """
+        Casts to standard pytorch
+        """
+        return torch.Tensor(self.q)
+    
     @property
     def i_mul(self):
         """
