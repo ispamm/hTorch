@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from math import factorial
-from quaternion import QuaternionTensor
+from .quaternion import QuaternionTensor
 import math
 from copy import copy
 
