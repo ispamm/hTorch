@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import re
 import sys
-from functions import *
+from .functions import *
 
 # does not find an application yet
 def apply_quaternion_gradient(model, layers):
