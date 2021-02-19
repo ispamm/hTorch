@@ -60,10 +60,10 @@ class QConv1d(nn.Module):
         super(QConv1d, self).__init__()
 
         assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
-        self.in_channels = in_channels
+        self.in_channels = in_channels * 4
 
         assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
-        self.out_channels = out_channels
+        self.out_channels = out_channels * 4
 
         self.kernel_size = kernel_size
         self.stride = stride
@@ -119,10 +119,10 @@ class QConv2d(nn.Module):
         super(QConv2d, self).__init__()
 
         assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
-        self.in_channels = in_channels
+        self.in_channels = in_channels * 4
 
         assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
-        self.out_channels = out_channels
+        self.out_channels = out_channels * 4
 
         self.kernel_size = kernel_size
         self.stride = stride
@@ -175,10 +175,10 @@ class QConv3d(nn.Module):
         super(QConv3d, self).__init__()
 
         assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
-        self.in_channels = in_channels
+        self.in_channels = in_channels * 4
 
         assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
-        self.out_channels = out_channels
+        self.out_channels = out_channels * 4
 
         self.kernel_size = kernel_size
         self.stride = stride
@@ -221,10 +221,10 @@ class QLinear(nn.Module):
         super(QLinear, self).__init__()
 
         assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
-        self.in_channels = in_channels
+        self.in_channels = in_channels * 4
 
         assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
-        self.out_channels = out_channels
+        self.out_channels = out_channels * 4
 
         self.bias = bias
         self.spinor = spinor
@@ -273,10 +273,10 @@ class QConvTranspose1d(nn.Module):
         super(QConvTranspose1d, self).__init__()
 
         assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
-        self.in_channels = in_channels
+        self.in_channels = in_channels * 4
 
         assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
-        self.out_channels = out_channels
+        self.out_channels = out_channels * 4
 
         self.kernel_size = kernel_size
         self.stride = stride
@@ -335,10 +335,10 @@ class QConvTranspose2d(nn.Module):
         super(QConvTranspose2d, self).__init__()
 
         assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
-        self.in_channels = in_channels
+        self.in_channels = in_channels * 4
 
         assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
-        self.out_channels = out_channels
+        self.out_channels = out_channels * 4
 
         self.kernel_size = kernel_size
         self.stride = stride
@@ -394,10 +394,10 @@ class QConvTranspose3d(nn.Module):
         super(QConvTranspose3d, self).__init__()
 
         assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
-        self.in_channels = in_channels
+        self.in_channels = in_channels * 4
 
         assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
-        self.out_channels = out_channels
+        self.out_channels = out_channels * 4
 
         self.kernel_size = kernel_size
         self.stride = stride
@@ -477,7 +477,7 @@ class QBatchNorm2d(nn.Module):
         super(QBatchNorm2d, self).__init__()
 
         assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
-        self.in_channels = in_channels
+        self.in_channels = in_channels * 4
 
         self.affine = affine
         self.training = training
@@ -596,10 +596,10 @@ class QAutogradConv1d(nn.Module):
         super(QAutogradConv1d, self).__init__()
 
         assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
-        self.in_channels = in_channels
+        self.in_channels = in_channels * 4
 
         assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
-        self.out_channels = out_channels
+        self.out_channels = out_channels * 4
 
         self.kernel_size = kernel_size
         self.stride = stride
@@ -655,10 +655,10 @@ class QAutogradConv2d(nn.Module):
         super(QAutogradConv2d, self).__init__()
 
         assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
-        self.in_channels = in_channels
+        self.in_channels = in_channels * 4
 
         assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
-        self.out_channels = out_channels
+        self.out_channels = out_channels * 4
 
         self.kernel_size = kernel_size
         self.stride = stride
@@ -713,10 +713,10 @@ class QAutogradConv3d(nn.Module):
         super(QAutogradConv3d, self).__init__()
 
         assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
-        self.in_channels = in_channels
+        self.in_channels = in_channels * 4
 
         assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
-        self.out_channels = out_channels
+        self.out_channels = out_channels * 4
 
         self.kernel_size = kernel_size
         self.stride = stride
@@ -760,10 +760,10 @@ class QAutogradLinear(nn.Module):
         super(QAutogradLinear, self).__init__()
 
         assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
-        self.in_channels = in_channels
+        self.in_channels = in_channels * 4
 
         assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
-        self.out_channels = out_channels
+        self.out_channels = out_channels * 4
 
         self.bias = bias
         self.spinor = spinor
@@ -814,10 +814,10 @@ class QAutogradConvTranspose1d(nn.Module):
         super(QAutogradConvTranspose1d, self).__init__()
 
         assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
-        self.in_channels = in_channels
+        self.in_channels = in_channels * 4
 
         assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
-        self.out_channels = out_channels
+        self.out_channels = out_channels * 4
 
         self.kernel_size = kernel_size
         self.stride = stride
@@ -875,10 +875,10 @@ class QAutogradConvTranspose2d(nn.Module):
         super(QAutogradConvTranspose2d, self).__init__()
 
         assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
-        self.in_channels = in_channels
+        self.in_channels = in_channels * 4
 
         assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
-        self.out_channels = out_channels
+        self.out_channels = out_channels * 4
 
         self.kernel_size = kernel_size
         self.stride = stride
@@ -936,10 +936,10 @@ class QAutogradConvTranspose3d(nn.Module):
         super(QAutogradConvTranspose3d, self).__init__()
 
         assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
-        self.in_channels = in_channels
+        self.in_channels = in_channels * 4
 
         assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
-        self.out_channels = out_channels
+        self.out_channels = out_channels * 4
 
         self.kernel_size = kernel_size
         self.stride = stride
