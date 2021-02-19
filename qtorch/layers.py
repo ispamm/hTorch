@@ -21,8 +21,6 @@ class QuaternionToReal(nn.Module):
     
     def __init__(self, in_channels):
         super(QuaternionToReal, self).__init__()
-        
-        assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
         self.in_channels = in_channels
     
     def forward(self, x, quat_format=False):
@@ -58,11 +56,7 @@ class QConv1d(nn.Module):
         @type spinor: bool
         """
         super(QConv1d, self).__init__()
-
-        assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
         self.in_channels = in_channels * 4
-
-        assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
         self.out_channels = out_channels * 4
 
         self.kernel_size = kernel_size
@@ -117,11 +111,7 @@ class QConv2d(nn.Module):
         @type spinor: bool
         """
         super(QConv2d, self).__init__()
-
-        assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
         self.in_channels = in_channels * 4
-
-        assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
         self.out_channels = out_channels * 4
 
         self.kernel_size = kernel_size
@@ -173,11 +163,7 @@ class QConv3d(nn.Module):
         @type spinor: bool
         """
         super(QConv3d, self).__init__()
-
-        assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
         self.in_channels = in_channels * 4
-
-        assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
         self.out_channels = out_channels * 4
 
         self.kernel_size = kernel_size
@@ -219,11 +205,7 @@ class QLinear(nn.Module):
 
     def __init__(self, in_channels, out_channels, bias=False, spinor=False):
         super(QLinear, self).__init__()
-
-        assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
         self.in_channels = in_channels * 4
-
-        assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
         self.out_channels = out_channels * 4
 
         self.bias = bias
@@ -271,11 +253,7 @@ class QConvTranspose1d(nn.Module):
         @type spinor: bool
         """
         super(QConvTranspose1d, self).__init__()
-
-        assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
         self.in_channels = in_channels * 4
-
-        assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
         self.out_channels = out_channels * 4
 
         self.kernel_size = kernel_size
@@ -333,11 +311,7 @@ class QConvTranspose2d(nn.Module):
         @type spinor: bool
         """
         super(QConvTranspose2d, self).__init__()
-
-        assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
         self.in_channels = in_channels * 4
-
-        assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
         self.out_channels = out_channels * 4
 
         self.kernel_size = kernel_size
@@ -392,11 +366,7 @@ class QConvTranspose3d(nn.Module):
         @type spinor: bool
         """
         super(QConvTranspose3d, self).__init__()
-
-        assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
         self.in_channels = in_channels * 4
-
-        assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
         self.out_channels = out_channels * 4
 
         self.kernel_size = kernel_size
@@ -475,8 +445,6 @@ class QBatchNorm2d(nn.Module):
         @type track_running_stats: bool
         """
         super(QBatchNorm2d, self).__init__()
-
-        assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
         self.in_channels = in_channels * 4
 
         self.affine = affine
@@ -516,7 +484,6 @@ class QBatchNorm2d(nn.Module):
             init.constant_(self.weight[3, 3], 1)
 
     def forward(self, x):
-        assert self.in_channels == x.size(1), "channels should be the same"
         x = torch.stack(torch.chunk(x, 4, 1), 1).permute(1, 0, 2, 3, 4)
         axes, d = (1, *range(3, x.dim())), x.shape[0]
         shape = 1, x.shape[2], *([1] * (x.dim() - 3))
@@ -594,11 +561,7 @@ class QAutogradConv1d(nn.Module):
         @type spinor: bool
         """
         super(QAutogradConv1d, self).__init__()
-
-        assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
         self.in_channels = in_channels * 4
-
-        assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
         self.out_channels = out_channels * 4
 
         self.kernel_size = kernel_size
@@ -653,11 +616,7 @@ class QAutogradConv2d(nn.Module):
         @type spinor: bool
         """
         super(QAutogradConv2d, self).__init__()
-
-        assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
         self.in_channels = in_channels * 4
-
-        assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
         self.out_channels = out_channels * 4
 
         self.kernel_size = kernel_size
@@ -711,11 +670,7 @@ class QAutogradConv3d(nn.Module):
         @type spinor: bool
         """
         super(QAutogradConv3d, self).__init__()
-
-        assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
         self.in_channels = in_channels * 4
-
-        assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
         self.out_channels = out_channels * 4
 
         self.kernel_size = kernel_size
@@ -758,11 +713,7 @@ class QAutogradLinear(nn.Module):
 
     def __init__(self, in_channels, out_channels, bias=False, spinor=False):
         super(QAutogradLinear, self).__init__()
-
-        assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
         self.in_channels = in_channels * 4
-
-        assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
         self.out_channels = out_channels * 4
 
         self.bias = bias
@@ -812,11 +763,7 @@ class QAutogradConvTranspose1d(nn.Module):
         @type spinor: bool
         """
         super(QAutogradConvTranspose1d, self).__init__()
-
-        assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
         self.in_channels = in_channels * 4
-
-        assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
         self.out_channels = out_channels * 4
 
         self.kernel_size = kernel_size
@@ -873,11 +820,7 @@ class QAutogradConvTranspose2d(nn.Module):
         @type spinor: bool
         """
         super(QAutogradConvTranspose2d, self).__init__()
-
-        assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
         self.in_channels = in_channels * 4
-
-        assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
         self.out_channels = out_channels * 4
 
         self.kernel_size = kernel_size
@@ -934,11 +877,7 @@ class QAutogradConvTranspose3d(nn.Module):
         @type spinor: bool
         """
         super(QAutogradConvTranspose3d, self).__init__()
-
-        assert in_channels % 4 == 0, "number of in_channels should be a multiple of 4"
         self.in_channels = in_channels * 4
-
-        assert out_channels % 4 == 0, "number of out_channels should be a multiple of 4"
         self.out_channels = out_channels * 4
 
         self.kernel_size = kernel_size
