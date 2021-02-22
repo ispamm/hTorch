@@ -24,7 +24,8 @@ def check_q_type(q):
     @type q: torch.Tensor/list/tuple
     """
     if isinstance(q, (tuple, list)):
-        if all(isinstance(i, torch.Tensor) for i in q) == True:
+        
+        if all(isinstance(i, torch.Tensor) for i in q) == True and len(q) != 0:
             if all(len(i.shape) == 1 for i in q):
                 q = torch.cat(q, 0)
             else:
@@ -93,7 +94,7 @@ class QuaternionTensor(torch.Tensor):
     """
     
     @staticmethod 
-    def __new__(cls, q, real_tensor=False, *args, **kwargs):
+    def __new__(cls, q=[], real_tensor=False, *args, **kwargs):
         
         q = check_q_type(q)
         if real_tensor:
@@ -102,7 +103,7 @@ class QuaternionTensor(torch.Tensor):
         cls.device = q.device
         return super().__new__(cls, q.cpu(), *args, **kwargs) 
 
-    def __init__(self, q, real_tensor=False):
+    def __init__(self, q=[], real_tensor=False):
         super().__init__()
         """
         Init accepts incoming quaternion and immediately
@@ -115,22 +116,33 @@ class QuaternionTensor(torch.Tensor):
         
         self.real_tensor = real_tensor
         q = check_q_type(q)
-        if real_tensor:
-            q = real_repr(q)
-
-        if len(q.shape) == 1:
-            self.a, self.b, self.c, self.d = torch.chunk(q, 4, 0)
-        else:
-            self.a, self.b, self.c, self.d = torch.chunk(q, 4, 1)
         
-        self.q = q
-        self.grad = None
+        if len(q) != 0:
+            if real_tensor:
+                q = real_repr(q)
+
+            if len(q.shape) == 1:
+                self.a, self.b, self.c, self.d = torch.chunk(q, 4, 0)
+            else:
+                self.a, self.b, self.c, self.d = torch.chunk(q, 4, 1)
+
+            self.q = q
+            self.grad = None
+        
+            
     
     def torch(self):
         """
         Casts to standard pytorch
         """
         return torch.Tensor(self.q)
+    
+    def rand(self, size):
+        """
+        Creates random QuaternionTensor
+        in the interval [0,1)
+        """
+        return self.__class__(torch.rand(size))
     
     @property
     def i_mul(self):
@@ -153,7 +165,6 @@ class QuaternionTensor(torch.Tensor):
         """
         return torch.cat([self.a, -self.b, -self.c, self.d], 1)
 
-    @property
     def min(self):
         """
         Minimum of quaternion.
@@ -167,7 +178,6 @@ class QuaternionTensor(torch.Tensor):
         """
         return self.a ** 2 + self.b ** 2 + self.c ** 2 + self.d ** 2
 
-    @property
     def inv(self):
         """
         Quaternion inverse.
@@ -214,7 +224,6 @@ class QuaternionTensor(torch.Tensor):
             vec = [0, self.b, self.c, self.d]
         return self.__class__(vec, False)
 
-    @property
     def theta(self):
         """
         Angle of the quaternion.
@@ -233,7 +242,6 @@ class QuaternionTensor(torch.Tensor):
 
         return self.__class__(con, False)
 
-    @property
     def norm(self):
         """
         Quaternion (non-squared) norm.
@@ -564,7 +572,7 @@ class QuaternionTensor(torch.Tensor):
         return self.__class__(out, False)
     
     def __str__(self):
-        return str(self.q)
+        return self.__repr__()
         
     
     def __repr__(self):
