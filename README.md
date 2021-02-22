@@ -1,5 +1,7 @@
 # Quaternion PyTorch
 
+![](coverage.svg)
+
 > :warning: **this is still heavily experimental**. Use at your own discretion!
 
 This repository contains code to extend PyTorch for use in quaternion-valued applications. We provide quaternion-valued tensors, layers, and examples. Code is designed to be as inter-operable as possible with basic real-valued PyTorch tensors and operations.
@@ -25,6 +27,26 @@ x.norm.sum().backward() # Take the absolute value, sum, and take the gradient
 ```
 
 See the [Basic notebook](notebooks/basic.ipynb) for an introduction to the basic concepts in the library.
+
+# Testing
+
+To manually run the unit tests:
+
+```
+python -m unittest discover -s ./tests -p *_test.py
+```
+
+If you have [coverage](https://coverage.readthedocs.io/en/latest/) installed:
+
+```
+coverage run -m unittest discover -s ./tests -p *_test.py
+```
+
+To generate again the coverage badge (not automated yet), install [coverage-badge](https://pypi.org/project/coverage-badge/), then run:
+
+```
+coverage-badge -o coverage.svg
+```
 
 ## References
 
