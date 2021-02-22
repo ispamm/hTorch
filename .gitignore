@@ -4,3 +4,5 @@ __pycache__/*.pyc
 build/*
 dist/*
 qtorch_giorgiozannini.egg-info/*
+README.md
+htmlcov/*
