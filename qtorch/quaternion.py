@@ -99,7 +99,8 @@ class QuaternionTensor(torch.Tensor):
         if real_tensor:
             q = real_repr(q)
         cls.q = q
-        return super().__new__(cls, q, *args, **kwargs) 
+        cls.device = q.device
+        return super().__new__(cls, q.cpu(), *args, **kwargs) 
 
     def __init__(self, q, real_tensor=False):
         super().__init__()
@@ -116,19 +117,11 @@ class QuaternionTensor(torch.Tensor):
         q = check_q_type(q)
         if real_tensor:
             q = real_repr(q)
-        
+
         if len(q.shape) == 1:
-            a, b, c, d = torch.chunk(q, 4, 0)
-            self.a = torch.Tensor(a)
-            self.b = torch.Tensor(b)
-            self.c = torch.Tensor(c)
-            self.d = torch.Tensor(d)
+            self.a, self.b, self.c, self.d = torch.chunk(q, 4, 0)
         else:
-            a, b, c, d = get_parts(q)
-            self.a = torch.Tensor(a.transpose(1, 0))
-            self.b = torch.Tensor(b.transpose(1, 0))
-            self.c = torch.Tensor(c.transpose(1, 0))
-            self.d = torch.Tensor(d.transpose(1, 0))
+            self.a, self.b, self.c, self.d = torch.chunk(q, 4, 1)
         
         self.q = q
         self.grad = None
@@ -248,19 +241,20 @@ class QuaternionTensor(torch.Tensor):
         return torch.sqrt(self.a ** 2 + self.b ** 2 + self.c ** 2 + self.d ** 2 + 1e-10)
    
     
-    def clone(self, *args, **kwargs): 
+    def clone(self): 
         """
         General Pytorch cloning.
         """
-        return QuaternionTensor(super().clone(*args, **kwargs))
+        return QuaternionTensor(super().clone())
 
-    def to(self, *args, **kwargs):
+    def to(self, device):
         """
         Sends tensor to CPU or GPU.
         """
-        new_obj = QuaternionTensor([], self.q)
-        tempTensor = super().to(*args, **kwargs)
+        new_obj = QuaternionTensor(self.q)
+        tempTensor = super().to(device)
         new_obj.data = tempTensor.data
+        new_obj.device = device
         new_obj.requires_grad = tempTensor.requires_grad
         
         return new_obj 
@@ -571,7 +565,11 @@ class QuaternionTensor(torch.Tensor):
         
     
     def __repr__(self):
-        return f"real part: {self.a}\n" +\
+        print(self.q, self.shape)
+        if self.shape == self.q.shape:
+            return f"real part: {self.a}\n" +\
                f"imaginary part (i): {self.b}\n" +\
                f"imaginary part (i): {self.c}\n" +\
                f"imaginary part (j): {self.d}"
+        else:
+            return str(self.q)
