@@ -4,7 +4,6 @@ import warnings
 import functools
 
 
-
 HANDLEdFUNCTIONS = {}
 
 def implements(torch_function):
@@ -16,13 +15,7 @@ def implements(torch_function):
     return decorator
 
 
-#################################
-#                               #
-#           Getters             #
-#                               #
-#################################
-
-
+# ----------------------------------- getters ---------------------------------------------
 
 @implements(torch.Tensor.shape.__get__)
 def shape(self):
@@ -33,10 +26,7 @@ def shape(self):
 
 @implements(torch.Tensor.T.__get__)
 def T(self):
-    """
-    Transposition
-    """
-    return torch.cat([self.a, self.b, self.c, self.d], 1)
+    return self.q.t()
 
 @implements(torch.Tensor.requires_grad.__get__)
 def get_requires_grad(self):
@@ -50,11 +40,7 @@ def get_grad(self):
 def get_item(self, idx):
     return torch.Tensor.__getitem__(self.q, idx)
 
-#################################
-#                               #
-#           Setters             #
-#                               #
-#################################
+# ----------------------------------- setters -------------------------------------------------
 
 @implements(torch.Tensor.requires_grad.__set__)
 def set_requires_grad(self, requires_grad):
@@ -64,11 +50,15 @@ def set_requires_grad(self, requires_grad):
 def set_grad(self, grad):
     self.q.grad = grad
     
-#################################
-#                               #
-#       Other functions         #
-#                               #
-#################################
+# ----------------------------------- general ------------------------------------------------
+
+@implements(torch.Tensor.t)
+def t(self):
+    return self.q.t()
+
+@implements(torch.chunk)
+def chunk(input, *args, **kwargs):
+    return torch.chunk(input.q, *args, **kwargs)
 
 @implements(torch.Tensor.cpu)
 def cpu(self):
@@ -77,6 +67,14 @@ def cpu(self):
 @implements(torch.Tensor.cuda)
 def cuda(self):
     return self.q.cuda()
+
+
+# -----------------------------activation functions ------------------------------------------
+
+@implements(torch.nn.functional.relu)
+def relu(input, *args, **kwargs):
+    return torch.nn.functional.relu(input.q, *args, **kwargs)
+
 
 # ----------------------------------- conj ---------------------------------------------------
 
@@ -252,6 +250,17 @@ def mul(self, other):
 def mul(input1, input2):
     return input1.mul(input2)
 
+
+# ----------------------------------- matmul ---------------------------------------------
+
+@implements(torch.Tensor.matmul)
+def matmul(self, other):
+    return torch.matmul(self.q, other)
+
+@implements(torch.matmul)
+def matmul(input1, input2):
+    return input1.matmul(input2)
+
 # ----------------------------------- div ------------------------------------------------
 
 @implements(torch.Tensor.div)
@@ -381,7 +390,7 @@ def log(input):
 
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
-# ----------------------------QuaternionTensor -------------------------------------------
+# ---------------------------- QuaternionTensor ------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 
@@ -687,6 +696,12 @@ class QuaternionTensor(torch.Tensor):
 
     def __imul__(self, other):
         return self.__class__(self * other)
+    
+    def __matmul__(self, other):
+        return torch.matmul(self, other)
+    
+    def __rmatmul__(self, other):
+        return self.__matmul__(other)
 
     def __truediv__(self, other):
         return torch.div(self, other)
