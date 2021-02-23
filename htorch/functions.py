@@ -36,7 +36,7 @@ def initialize_linear(in_channels, out_channels, init_mode="he"):
 
     img_mat = torch.Tensor(*size_img).uniform_(-1, 1)
     mat = Q(torch.cat([torch.zeros(size_real), img_mat], 1), False)
-    mat /= torch.cat([mat.norm]*4, 1)
+    mat /= torch.cat([mat.norm()]*4, 1)
     
     phase = torch.Tensor(*size_real).uniform_(-np.pi, np.pi)
     magnitude = torch.from_numpy(chi.rvs(4, loc=0, scale=scale, size=size_real)).float()
@@ -81,7 +81,7 @@ def initialize_conv(in_channels, out_channels, kernel_size=[2, 2], init_mode="he
 
     img_mat = torch.Tensor(*size_img).uniform_(-1, 1)
     mat = Q(torch.cat([torch.zeros(size_real), img_mat], 1), False)
-    mat /= torch.cat([mat.norm]*4, 1)
+    mat /= torch.cat([mat.norm()]*4, 1)
     
     phase = torch.Tensor(*size_real).uniform_(-np.pi, np.pi)
     magnitude = torch.from_numpy(chi.rvs(4, loc=0, scale=scale, size=size_real)).float()
