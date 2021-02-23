@@ -1,6 +1,6 @@
 import unittest
 import torch
-from qtorch.quaternion import QuaternionTensor
+from htorch.quaternion import QuaternionTensor
 
 class TestQuaternionTensor(unittest.TestCase):
 
