@@ -26,13 +26,13 @@ class QuaternionToReal(nn.Module):
     def forward(self, x, quat_format=False):
         
         if quat_format:
-            norm = x.norm
+            norm = x.norm()
             if len(norm.shape) == 1:
                 out = Q(torch.cat([norm,*[torch.zeros_like(norm)]*3], 0))
             else:
                 out = Q(torch.cat([norm,*[torch.zeros_like(norm)]*3], 1))
         else:
-            out = x.norm
+            out = x.norm()
             
         return out
 
@@ -416,7 +416,7 @@ class QMaxPool2d(nn.Module):
         self.pool = nn.MaxPool2d(kernel_size, stride, padding, return_indices=True)
 
     def forward(self, x):
-        c, idx = self.pool(x.norm)
+        c, idx = self.pool(x.norm())
         idx = torch.cat([idx]*4, 1)
         flat = x.flatten(start_dim=2)
         output = flat.gather(dim=2, index=idx.flatten(start_dim=2)).view_as(idx)
