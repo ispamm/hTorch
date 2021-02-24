@@ -86,7 +86,8 @@ class QConv1d(nn.Module):
             self.bias = None
 
     def forward(self, x):
-
+        if len(x.shape) == 5:
+            x = torch.cat([*x.chunk()], 2).squeeze()
         return Q(F.conv1d(x, self.weight, self.bias, self.stride,
                         self.padding, self.dilation, self.groups))
 
