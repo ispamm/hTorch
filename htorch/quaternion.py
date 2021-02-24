@@ -219,6 +219,8 @@ def add(self, other):
             out = self.q + other.q        
         elif isinstance(other, int):
             out = [self.a + other, self.b, self.c, self.d]
+        elif len(other) == 1:
+            out = [self.a + other, self.b, self.c, self.d]
         else:
             out = self.q + other
         
