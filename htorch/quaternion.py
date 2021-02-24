@@ -303,7 +303,7 @@ def true_div(self, other):
     real_tensor = False
 
     if isinstance(other, QuaternionTensor):
-        out = self.q * other.inverse()
+        out = self * other.inverse()
 
     elif isinstance(other, torch.Tensor):
         if len(other.shape) > 1 and len(self.shape) > 1:
@@ -741,7 +741,7 @@ class QuaternionTensor(torch.Tensor):
                     out = other * self.q
             else:
                 if len(other.shape) == 1 and other.shape[0] == self.shape[0]:
-                    out = torch.stack([other]*self.shape[1], 1) * self.q
+                    out = other * self.q
                 else:
                     out = other * self.q
         else:
@@ -762,7 +762,7 @@ class QuaternionTensor(torch.Tensor):
         return torch.div(self, other)
 
     def __rtruediv__(self, other):
-
+            
         if isinstance(other, torch.Tensor):
             if len(other.shape) > 1 and len(self.shape) > 1: 
                 if other.shape[1] * 4 == self.shape[1]:
