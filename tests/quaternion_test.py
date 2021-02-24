@@ -1,6 +1,10 @@
 import unittest
+import sys  # DOPO LEVALO GIOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+sys.path.append("..")
 import torch
 from htorch.quaternion import QuaternionTensor
+import pyquaternion
+
 
 class TestQuaternionTensor(unittest.TestCase):
 
@@ -9,6 +13,45 @@ class TestQuaternionTensor(unittest.TestCase):
         x = QuaternionTensor([0.1, 0.2, 0.3, 0.4])
         print(x.torch())
         self.assertTrue(torch.equal(x.torch(), torch.tensor([0.1, 0.2, 0.3, 0.4])))
+
+    def test_add(self):
+        # Test adding two quaternions
+        q = [0.1, 0.2, 0.3, 0.4]
+        x = QuaternionTensor(q)
+        y = pyquaternion.Quaternion(*q)
+        print(x + x, y + y)
+        self.assertTrue(torch.allclose(x + x, torch.Tensor((y + y).q))) 
+    
+    def test_scalar_add(self):
+        # Test adding a quaternion and a scalar
+        q = [0.1, 0.2, 0.3, 0.4]
+        x = QuaternionTensor(q)
+        y = pyquaternion.Quaternion(*q)
+        self.assertTrue(torch.allclose(x + 1, torch.Tensor((y + 1).q)))
+
+    def test_mul(self):
+        # Test multiplying two quaternions
+        q1 = [0.1, 0.2, 0.3, 0.4]
+        q2 = [1, 2, 3, 4]
+
+        x1 = QuaternionTensor(q1)
+        x2 = QuaternionTensor(q2)
+
+        y1 = pyquaternion.Quaternion(*q1)
+        y2 = pyquaternion.Quaternion(*q2)
+        self.assertTrue(torch.allclose(x1*x2, torch.Tensor((y1*y2).q))) 
+
+    def test_div(self):
+        # Test dividing two quaternions
+        q1 = [0.1, 0.2, 0.3, 0.4]
+        q2 = [1, 2, 3, 4]
+
+        x1 = QuaternionTensor(q1)
+        x2 = QuaternionTensor(q2)
+
+        y1 = pyquaternion.Quaternion(*q1)
+        y2 = pyquaternion.Quaternion(*q2)
+        self.assertTrue(torch.allclose(x1/x2, torch.Tensor((y1/y2).q)))
 
 if __name__ == '__main__':
     unittest.main()
