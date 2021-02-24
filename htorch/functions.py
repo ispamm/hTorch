@@ -43,7 +43,6 @@ def initialize_linear(in_channels, out_channels, init_mode="he"):
     
     mat *= factor
     mat += r
-    print(mat.shape)
     return mat
 
 

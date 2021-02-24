@@ -198,23 +198,24 @@ def add(self, other):
     Standard addition but only adds the other tensor
     to the real part if it has 1/4 of the channels.
     """
-    if len(self.q) != 4:
+    if np.prod(self.shape) != 4:
         if isinstance(other, torch.Tensor):
             if other.__class__.__name__ == "QuaternionTensor":
                 other = other.q
-                if len(other.shape) > 1 and len(self.shape) > 1:
-                    if other.shape[1] * 4 == self.shape[1]:
-                        out = torch.cat([self.a + other, self.b, self.c, self.d], 1)
-                        if self.real_tensor:
-                            out = real_repr(out)
-                    else:
-                        out = self.q + other                    
+            if len(other.shape) > 1 and len(self.shape) > 1:
+                if other.shape[1] * 4 == self.shape[1]:
+                    out = torch.cat([self.a + other, self.b, self.c, self.d], 1)
+                    if self.real_tensor:
+                        out = real_repr(out)
                 else:
-                    out = self.q + other
+                    out = self.q + other                    
+            else:
+                out = self.q + other
         else:
             out = self.q + other
                             
     else:
+        print(self.shape)
         if other.__class__.__name__ == "QuaternionTensor":
             out = self.q + other.q        
         elif isinstance(other, int):
