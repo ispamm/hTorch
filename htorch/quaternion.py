@@ -76,6 +76,25 @@ def reshape(self, *args, **kwargs):
 def view(self, *args, **kwargs):
     return self.q.view(*args, **kwargs)
 
+@implements(torch.allclose)
+def allclose(input1, input2, *args, **kwargs):
+    if all(isinstance(i, QuaternionTensor) for i in [input1, input2]):
+        return torch.allclose(input1.q, input2.q)
+    else:
+        return torch.allclose(input1.q, input2)
+
+@implements(torch.cat)
+def cat(input, *args, **kwargs):
+    return torch.cat(input, *args, **kwargs)
+
+@implements(torch.stack)
+def stack(input, *args, **kwargs):
+    return torch.cat(input, *args, **kwargs)
+
+@implements(torch.Tensor.neg)
+def neg(input):
+    return input.__class__(-input.q)
+
 # -----------------------------activation functions ------------------------------------------
 
 @implements(torch.nn.functional.relu)
@@ -165,7 +184,7 @@ def norm(self, *args, **kwargs):
     """
     Quaternion (non-squared) norm.
     """
-    return torch.norm(torch.stack([self.a, self.b, self.c, self.d], 1), dim = 1)
+    return torch.sqrt(self.a**2 + self.b**2 + self.c**2 + self.d**2)
 
 @implements(torch.linalg.norm)
 def norm(input, *args, **kwargs):
@@ -179,26 +198,30 @@ def add(self, other):
     Standard addition but only adds the other tensor
     to the real part if it has 1/4 of the channels.
     """
-
-    if isinstance(other, torch.Tensor):
-        if len(other.shape) > 1 and len(self.shape) > 1:
-            if other.shape[1] * 4 == self.shape[1]:
-                a = self.a + other
-                out = torch.cat([a, self.b, self.c, self.d], 1)
-                if self.real_tensor:
-                    out = real_repr(out)
-            else:
-                out = self.q + other                    
+    if len(self.q) != 4:
+        if isinstance(other, torch.Tensor):
+            if other.__class__.__name__ == "QuaternionTensor":
+                other = other.q
+                if len(other.shape) > 1 and len(self.shape) > 1:
+                    if other.shape[1] * 4 == self.shape[1]:
+                        out = torch.cat([self.a + other, self.b, self.c, self.d], 1)
+                        if self.real_tensor:
+                            out = real_repr(out)
+                    else:
+                        out = self.q + other                    
+                else:
+                    out = self.q + other
         else:
-            if len(other.shape) == 1 and other.shape[0] == self.shape[0]:
-                a = self.a + torch.stack([other]*(self.shape[1]//4), 1)
-                out = torch.cat([a, self.b, self.c, self.d], 1)
-                if self.real_tensor:
-                    out = real_repr(out)
-            else:
-                out = self.q + other
+            out = self.q + other
+                            
     else:
-        out = self.q + other
+        if other.__class__.__name__ == "QuaternionTensor":
+            out = self.q + other.q        
+        elif isinstance(other, int):
+            out = [self.a + other, self.b, self.c, self.d]
+        else:
+            out = self.q + other
+        
 
     return self.__class__(out)
 
@@ -700,7 +723,7 @@ class QuaternionTensor(torch.Tensor):
         return torch.add(self, -other)
 
     def __rsub__(self, other):
-        return -self.__sub__(other)
+        return -self.__add__(-other)
     
     def __isub__(self, other):
         return self.__class__(self - other)
