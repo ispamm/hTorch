@@ -3,6 +3,6 @@ __pycache__/*.pyc
 .vscode/*
 build/*
 dist/*
-qtorch_giorgiozannini.egg-info/*
+htorch_giorgiozannini.egg-info/*
 README.md
 htmlcov/*
