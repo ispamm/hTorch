@@ -19,7 +19,6 @@ class TestQuaternionTensor(unittest.TestCase):
         q = [0.1, 0.2, 0.3, 0.4]
         x = QuaternionTensor(q)
         y = pyquaternion.Quaternion(*q)
-        print(x + x, y + y)
         self.assertTrue(torch.allclose(x + x, torch.Tensor((y + y).q))) 
     
     def test_scalar_add(self):
@@ -52,6 +51,30 @@ class TestQuaternionTensor(unittest.TestCase):
         y1 = pyquaternion.Quaternion(*q1)
         y2 = pyquaternion.Quaternion(*q2)
         self.assertTrue(torch.allclose(x1/x2, torch.Tensor((y1/y2).q)))
+
+    def test_norm(self):
+        # Test calculating notm of a quaternion
+        q = [0.1, 0.2, 0.3, 0.4]
+        x = QuaternionTensor(q)
+        y = pyquaternion.Quaternion(*q)
+        
+        self.assertTrue(torch.allclose(x.norm(), torch.Tensor([y.norm]))) 
+
+    def test_pow(self):
+        # Test raising quaternion to power
+        q = [0.1, 0.2, 0.3, 0.4]
+        x = QuaternionTensor(q)
+        y = pyquaternion.Quaternion(*q)
+        
+        self.assertTrue(torch.allclose(x**2, torch.Tensor((y**2).q))) 
+
+    def test_exp(self):
+        # Test quaternion exponential
+        q = [0.1, 0.2, 0.3, 0.4]
+        x = QuaternionTensor(q)
+        y = pyquaternion.Quaternion(*q)
+        
+        self.assertTrue(torch.allclose(x.exp(), torch.Tensor((pyquaternion.Quaternion.exp(y).q)))) 
 
 if __name__ == '__main__':
     unittest.main()
