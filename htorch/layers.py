@@ -56,8 +56,8 @@ class QConv1d(nn.Module):
         @type spinor: bool
         """
         super(QConv1d, self).__init__()
-        self.in_channels = in_channels * 4
-        self.out_channels = out_channels * 4
+        self.in_channels = in_channels
+        self.out_channels = out_channels
 
         self.kernel_size = kernel_size
         self.stride = stride
@@ -80,7 +80,7 @@ class QConv1d(nn.Module):
             self.weight = nn.Parameter(quaternion_weight._real_repr)
         
         if self.bias:
-            bias = torch.zeros(self.out_channels)
+            bias = torch.zeros(self.out_channels*4)
             self.bias = nn.Parameter(bias)
         else:
             self.bias = None
@@ -111,8 +111,8 @@ class QConv2d(nn.Module):
         @type spinor: bool
         """
         super(QConv2d, self).__init__()
-        self.in_channels = in_channels * 4
-        self.out_channels = out_channels * 4
+        self.in_channels = in_channels 
+        self.out_channels = out_channels 
 
         self.kernel_size = kernel_size
         self.stride = stride
@@ -134,12 +134,14 @@ class QConv2d(nn.Module):
             self.weight = nn.Parameter(quaternion_weight._real_repr)
 
         if self.bias:
-            bias = torch.zeros(self.out_channels)
+            bias = torch.zeros(self.out_channels*4)
             self.bias = nn.Parameter(bias)
         else:
             self.bias = None
 
     def forward(self, x):
+        if len(x.shape) == 5:
+            x = torch.cat([*x.chunk()], 2).squeeze()
         return Q(F.conv2d(x, self.weight, self.bias, self.stride,
                                   self.padding, self.dilation, self.groups))
 
@@ -163,8 +165,8 @@ class QConv3d(nn.Module):
         @type spinor: bool
         """
         super(QConv3d, self).__init__()
-        self.in_channels = in_channels * 4
-        self.out_channels = out_channels * 4
+        self.in_channels = in_channels 
+        self.out_channels = out_channels 
 
         self.kernel_size = kernel_size
         self.stride = stride
@@ -187,13 +189,14 @@ class QConv3d(nn.Module):
             self.weight = nn.Parameter(quaternion_weight._real_repr)
 
         if self.bias:
-            bias = torch.zeros(self.out_channels)
+            bias = torch.zeros(self.out_channels*4)
             self.bias = nn.Parameter(bias)
         else:
             self.bias = None
 
     def forward(self, x):
-
+        if len(x.shape) == 5:
+            x = torch.cat([*x.chunk()], 2).squeeze()
         return Q(F.conv3d(x, self.weight, self.bias, self.stride,
                         self.padding, self.dilation, self.groups))
 
@@ -205,8 +208,8 @@ class QLinear(nn.Module):
 
     def __init__(self, in_channels, out_channels, bias=False, spinor=False):
         super(QLinear, self).__init__()
-        self.in_channels = in_channels * 4
-        self.out_channels = out_channels * 4
+        self.in_channels = in_channels 
+        self.out_channels = out_channels 
 
         self.bias = bias
         self.spinor = spinor
@@ -223,13 +226,14 @@ class QLinear(nn.Module):
             self.weight = nn.Parameter(quaternion_weight._real_repr)
 
         if self.bias:
-            bias = torch.zeros(self.out_channels)
+            bias = torch.zeros(self.out_channels*4)
             self.bias = nn.Parameter(bias)
         else:
             self.bias = None
 
     def forward(self, x):
-
+        if len(x.shape) == 3:
+            x = torch.cat([*x.chunk()], 2).squeeze()
         return Q(F.linear(x, self.weight, self.bias))
 
 
@@ -253,8 +257,8 @@ class QConvTranspose1d(nn.Module):
         @type spinor: bool
         """
         super(QConvTranspose1d, self).__init__()
-        self.in_channels = in_channels * 4
-        self.out_channels = out_channels * 4
+        self.in_channels = in_channels 
+        self.out_channels = out_channels 
 
         self.kernel_size = kernel_size
         self.stride = stride
@@ -278,13 +282,14 @@ class QConvTranspose1d(nn.Module):
             self.weight = nn.Parameter(quaternion_weight._real_repr)
 
         if self.bias:
-            bias = torch.zeros(self.out_channels)
+            bias = torch.zeros(self.out_channels*4)
             self.bias = nn.Parameter(bias)
         else:
             self.bias = None
 
     def forward(self, x):
-
+        if len(x.shape) == 5:
+            x = torch.cat([*x.chunk()], 2).squeeze()
         return Q(F.conv_transpose1d(x, self.weight, self.bias, self.stride,
                                   self.padding, self.output_padding, self.groups, self.dilation))
 
@@ -311,8 +316,8 @@ class QConvTranspose2d(nn.Module):
         @type spinor: bool
         """
         super(QConvTranspose2d, self).__init__()
-        self.in_channels = in_channels * 4
-        self.out_channels = out_channels * 4
+        self.in_channels = in_channels 
+        self.out_channels = out_channels 
 
         self.kernel_size = kernel_size
         self.stride = stride
@@ -335,13 +340,14 @@ class QConvTranspose2d(nn.Module):
             self.weight = nn.Parameter(quaternion_weight._real_repr)
 
         if self.bias:
-            bias = torch.zeros(self.out_channels)
+            bias = torch.zeros(self.out_channels*4)
             self.bias = nn.Parameter(bias)
         else:
             self.bias = None
 
     def forward(self, x):
-
+        if len(x.shape) == 5:
+            x = torch.cat([*x.chunk()], 2).squeeze()
         return Q(F.conv_transpose2d(x, self.weight, self.bias, self.stride,
                                   self.padding, self.output_padding, self.groups, self.dilation))
 
@@ -366,8 +372,8 @@ class QConvTranspose3d(nn.Module):
         @type spinor: bool
         """
         super(QConvTranspose3d, self).__init__()
-        self.in_channels = in_channels * 4
-        self.out_channels = out_channels * 4
+        self.in_channels = in_channels 
+        self.out_channels = out_channels 
 
         self.kernel_size = kernel_size
         self.stride = stride
@@ -390,13 +396,14 @@ class QConvTranspose3d(nn.Module):
             self.weight = nn.Parameter(quaternion_weight._real_repr)
             
         if self.bias:
-            bias = torch.zeros(self.out_channels)
+            bias = torch.zeros(self.out_channels*4)
             self.bias = nn.Parameter(bias)
         else:
             self.bias = None
 
     def forward(self, x):
-
+        if len(x.shape) == 5:
+            x = torch.cat([*x.chunk()], 2).squeeze()
         return Q(F.conv_transpose3d(x, self.weight, self.bias, self.stride,
                                   self.padding, self.output_padding, self.groups, self.dilation))
 
@@ -445,7 +452,7 @@ class QBatchNorm2d(nn.Module):
         @type track_running_stats: bool
         """
         super(QBatchNorm2d, self).__init__()
-        self.in_channels = in_channels * 4
+        self.in_channels = in_channels 
 
         self.affine = affine
         self.training = training
@@ -537,7 +544,7 @@ class QBatchNorm2d(nn.Module):
     
 #########################################################################################
 #                                                                                       #
-#                            QUATERNION AUTOGRAD LAYERS                                 #
+#               QUATERNION AUTOGRAD LAYERS (highly experimental)                        #
 #                                                                                       #
 #########################################################################################
    
@@ -561,8 +568,8 @@ class QAutogradConv1d(nn.Module):
         @type spinor: bool
         """
         super(QAutogradConv1d, self).__init__()
-        self.in_channels = in_channels * 4
-        self.out_channels = out_channels * 4
+        self.in_channels = in_channels 
+        self.out_channels = out_channels 
 
         self.kernel_size = kernel_size
         self.stride = stride
@@ -585,7 +592,7 @@ class QAutogradConv1d(nn.Module):
             self.weight = nn.Parameter(quaternion_weight._real_repr)
 
         if self.bias:
-            bias = torch.zeros(self.out_channels)
+            bias = torch.zeros(self.out_channels*4)
             self.bias = nn.Parameter(bias)
         else:
             self.bias = None
@@ -616,8 +623,8 @@ class QAutogradConv2d(nn.Module):
         @type spinor: bool
         """
         super(QAutogradConv2d, self).__init__()
-        self.in_channels = in_channels * 4
-        self.out_channels = out_channels * 4
+        self.in_channels = in_channels 
+        self.out_channels = out_channels 
 
         self.kernel_size = kernel_size
         self.stride = stride
@@ -640,7 +647,7 @@ class QAutogradConv2d(nn.Module):
             self.weight = nn.Parameter(quaternion_weight._real_repr)
 
         if self.bias:
-            bias = torch.zeros(self.out_channels)
+            bias = torch.zeros(self.out_channels*4)
             self.bias = nn.Parameter(bias)
         else:
             self.bias = None
@@ -670,8 +677,8 @@ class QAutogradConv3d(nn.Module):
         @type spinor: bool
         """
         super(QAutogradConv3d, self).__init__()
-        self.in_channels = in_channels * 4
-        self.out_channels = out_channels * 4
+        self.in_channels = in_channels 
+        self.out_channels = out_channels 
 
         self.kernel_size = kernel_size
         self.stride = stride
@@ -694,7 +701,7 @@ class QAutogradConv3d(nn.Module):
             self.weight = nn.Parameter(quaternion_weight._real_repr)
 
         if self.bias:
-            bias = torch.zeros(self.out_channels)
+            bias = torch.zeros(self.out_channels*4)
             self.bias = nn.Parameter(bias)
         else:
             self.bias = None
@@ -713,8 +720,8 @@ class QAutogradLinear(nn.Module):
 
     def __init__(self, in_channels, out_channels, bias=False, spinor=False):
         super(QAutogradLinear, self).__init__()
-        self.in_channels = in_channels * 4
-        self.out_channels = out_channels * 4
+        self.in_channels = in_channels 
+        self.out_channels = out_channels 
 
         self.bias = bias
         self.spinor = spinor
@@ -731,7 +738,7 @@ class QAutogradLinear(nn.Module):
             self.weight = nn.Parameter(quaternion_weight._real_repr)
 
         if self.bias:
-            bias = torch.zeros(self.out_channels)
+            bias = torch.zeros(self.out_channels*4)
             self.bias = nn.Parameter(bias)
         else:
             self.bias = None
@@ -763,8 +770,8 @@ class QAutogradConvTranspose1d(nn.Module):
         @type spinor: bool
         """
         super(QAutogradConvTranspose1d, self).__init__()
-        self.in_channels = in_channels * 4
-        self.out_channels = out_channels * 4
+        self.in_channels = in_channels 
+        self.out_channels = out_channels 
 
         self.kernel_size = kernel_size
         self.stride = stride
@@ -787,7 +794,7 @@ class QAutogradConvTranspose1d(nn.Module):
             self.weight = nn.Parameter(quaternion_weight._real_repr)
 
         if self.bias:
-            bias = torch.zeros(self.out_channels)
+            bias = torch.zeros(self.out_channels*4)
             self.bias = nn.Parameter(bias)
         else:
             self.bias = None
@@ -820,8 +827,8 @@ class QAutogradConvTranspose2d(nn.Module):
         @type spinor: bool
         """
         super(QAutogradConvTranspose2d, self).__init__()
-        self.in_channels = in_channels * 4
-        self.out_channels = out_channels * 4
+        self.in_channels = in_channels 
+        self.out_channels = out_channels 
 
         self.kernel_size = kernel_size
         self.stride = stride
@@ -844,7 +851,7 @@ class QAutogradConvTranspose2d(nn.Module):
             self.weight = nn.Parameter(quaternion_weight._real_repr)
 
         if self.bias:
-            bias = torch.zeros(self.out_channels)
+            bias = torch.zeros(self.out_channels*4)
             self.bias = nn.Parameter(bias)
         else:
             self.bias = None
@@ -877,8 +884,8 @@ class QAutogradConvTranspose3d(nn.Module):
         @type spinor: bool
         """
         super(QAutogradConvTranspose3d, self).__init__()
-        self.in_channels = in_channels * 4
-        self.out_channels = out_channels * 4
+        self.in_channels = in_channels 
+        self.out_channels = out_channels 
 
         self.kernel_size = kernel_size
         self.stride = stride
@@ -902,7 +909,7 @@ class QAutogradConvTranspose3d(nn.Module):
             self.weight = nn.Parameter(quaternion_weight._real_repr)
 
         if self.bias:
-            bias = torch.zeros(self.out_channels)
+            bias = torch.zeros(self.out_channels*4)
             self.bias = nn.Parameter(bias)
         else:
             self.bias = None

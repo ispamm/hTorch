@@ -68,6 +68,13 @@ def cpu(self):
 def cuda(self):
     return self.q.cuda()
 
+@implements(torch.Tensor.reshape)
+def reshape(self, *args, **kwargs):
+    return self.q.reshape(*args, **kwargs)
+
+@implements(torch.Tensor.view)
+def view(self, *args, **kwargs):
+    return self.q.view(*args, **kwargs)
 
 # -----------------------------activation functions ------------------------------------------
 
@@ -386,8 +393,31 @@ def log(self):
 def log(input):
     return input.log()
 
+# ----------------------------------- layers ------------------------------------------------
 
+@implements(torch.conv1d)
+def conv1d(input, *args, **kwargs):
+    return torch.conv1d(input.q, *args, **kwargs)
 
+@implements(torch.conv2d)
+def conv2d(input, *args, **kwargs):
+    return torch.conv2d(input.q, *args, **kwargs)
+
+@implements(torch.conv3d)
+def conv3d(input, *args, **kwargs):
+    return torch.conv3d(input.q, *args, **kwargs)
+
+@implements(torch.conv_transpose1d)
+def conv_transpose1d(input, *args, **kwargs):
+    return torch.conv_transpose1d(input.q, *args, **kwargs)
+
+@implements(torch.conv_transpose2d)
+def conv_transpose2d(input, *args, **kwargs):
+    return torch.conv_transpose2d(input.q, *args, **kwargs)
+
+@implements(torch.conv_transpose3d)
+def conv_transpose3d(input, *args, **kwargs):
+    return torch.conv_transpose3d(input.q, *args, **kwargs)
 
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
@@ -419,6 +449,7 @@ def check_q_type(q):
     if isinstance(q, (tuple, list)):
         
         if all(isinstance(i, torch.Tensor) for i in q) == True and len(q) != 0:
+            assert len(q) == 4, "Quaternion must have 4 elements."
             if all(len(i.shape) == 1 for i in q):
                 q = torch.cat(q, 0)
             else:
