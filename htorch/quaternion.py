@@ -375,7 +375,8 @@ def log(self):
             out = real + vector
         else:
             vector = (v / v_norm) * self.theta()
-            out = [real, vector[1].unsqueeze(0), vector[2].unsqueeze(0), vector[3].unsqueeze(0)]
+            out = [real.unsqueeze(0), vector[1].unsqueeze(0),
+                   vector[2].unsqueeze(0), vector[3].unsqueeze(0)]
 
         return self.__class__(out)
     else:
@@ -421,7 +422,7 @@ def check_q_type(q):
             if all(len(i.shape) == 1 for i in q):
                 q = torch.cat(q, 0)
             else:
-                q = torch.cat(q, 1)
+                q = torch.stack(q, 1)
         else:
             q = torch.Tensor(q)
     return q
