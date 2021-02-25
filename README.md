@@ -45,7 +45,7 @@ coverage run -m unittest discover -s ./tests -p *_test.py
 To generate again the coverage badge (not automated yet), install [coverage-badge](https://pypi.org/project/coverage-badge/), then run:
 
 ```
-coverage-badge -o coverage.svg
+coverage-badge -o coverage.svg -f
 ```
 
 ## References
