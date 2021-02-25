@@ -450,6 +450,10 @@ def conv_transpose2d(input, *args, **kwargs):
 def conv_transpose3d(input, *args, **kwargs):
     return torch.conv_transpose3d(input.q, *args, **kwargs)
 
+@implements(torch.nn.functional.batch_norm)
+def bn(input, *args, **kwargs):
+    return torch.nn.functional.batch_norm(input.q, *args, **kwargs)
+
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ---------------------------- QuaternionTensor ------------------------------------------
