@@ -100,6 +100,10 @@ def stack(input, *args, **kwargs):
 def neg(input):
     return input.__class__(-input.q)
 
+@implements(torch.nn.functional._pad)
+def pad(input, *args, **kwargs):
+    return torch.nn.functional._pad(input.q)
+
 # -----------------------------activation functions ------------------------------------------
 
 @implements(torch.nn.functional.relu)
@@ -214,8 +218,10 @@ def add(self, other):
                         out = real_repr(out)
                 else:
                     out = self.q + other                    
-            else:
-                out = self.q + other
+            elif other.dim() <= 1 and self.dim() > 1:
+                out = torch.cat([self.a + other.unsqueeze(1), self.b, self.c, self.d], 1)
+                if self.real_tensor:
+                    out = real_repr(out)
         else:
             out = self.q + other
                             
