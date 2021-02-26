@@ -6,6 +6,21 @@ import re
 import sys
 from .functions import *
 
+grayscale = torchvision.transforms.Grayscale(num_output_channels=1)
+
+def convert_data_for_quaternion(batch):
+    """
+    converts batches of RGB images in 4 channels for QNNs
+    """
+    assert all(batch[i][0].size(0) == 3 for i in range(len(batch)))
+    inputs, labels = [], []
+    for i in range(len(batch)):
+        inputs.append(torch.cat([batch[i][0], grayscale(batch[i][0])], 0))
+        labels.append(batch[i][1])
+    
+    return torch.stack(inputs), torch.stack(labels)
+    
+
 # does not find an application yet
 def apply_quaternion_gradient(model, layers):
     """
