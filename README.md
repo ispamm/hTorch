@@ -1,6 +1,7 @@
 # Quaternion PyTorch
-
-<img src="https://github.com/giorgiozannini/hTorch/blob/main/image.png" width = 300>
+<p align="center">
+  <img src="https://github.com/giorgiozannini/hTorch/blob/main/image.png" width = 300>
+</p>
 
 ![](coverage.svg)
 
