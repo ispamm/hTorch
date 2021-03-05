@@ -18,7 +18,7 @@ def convert_data_for_quaternion(batch):
         inputs.append(torch.cat([batch[i][0], grayscale(batch[i][0])], 0))
         labels.append(batch[i][1])
     
-    return torch.stack(inputs), torch.stack(labels)
+    return torch.stack(inputs), torch.LongTensor(labels)
     
 
 # does not find an application yet

@@ -1,4 +1,7 @@
 # Quaternion PyTorch
+<p align="center">
+  <img src="https://github.com/giorgiozannini/hTorch/blob/main/image.png" width = 300>
+</p>
 
 ![](coverage.svg)
 
@@ -10,23 +13,35 @@ This code draws in large part from Titouan Parcollet's [code](https://github.com
 
 ## Installation
 
-After cloning the repository, simply run:
+After cloning the repository, install the requirements as:
 
 ```
-python setup.py install 
+pip install -r requirements.txt
+```
+
+If you want to run the unit tests, you will also need the [pyquaternion](http://kieranwynn.github.io/pyquaternion/) library. Then, install the library by running:
+
+```
+pip install -e .
 ```
 
 ## Using the library
 
-The basic unit of the library is the `QuaternionTensor`, and extension of PyTorch's tensor to handle quaternion-valued elements. We provide a number of operations from quaternion algebra and inter-operability with PyTorch:
+The basic unit of the library is the `QuaternionTensor`, an extension of the PyTorch's `tensor` class to handle quaternion-valued elements. You can initialize a quaternion tensor by specifying the four components, or by providing a (..., 4)-dimensional tensor:
 
 ```python
-x = quaternion.QuaternionTensor(torch.rand(2, 4, requires_grad=True)) # A vector with two quaternions
+# A vector with two quaternions
+x = quaternion.QuaternionTensor(torch.rand(2, 4, requires_grad=True))
+```
+
+We provide a number of operations from quaternion algebra and inter-operability with PyTorch:
+
+```python
 x = x * torch.rand(2) # Multiply with real-valued scalars
 x.norm.sum().backward() # Take the absolute value, sum, and take the gradient
 ```
 
-See the [Basic notebook](notebooks/basic.ipynb) for an introduction to the basic concepts in the library.
+We also provide layers and utilities to work with PyTorch modules. See the [Basic notebook](notebooks/basic.ipynb) for an introduction to the basic concepts in the library, and the [Training notebook](notebooks/training.ipynb) for an example of training a quaternion-valued CNN.
 
 # Testing
 
