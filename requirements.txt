@@ -1,3 +1,4 @@
+--find-links https://download.pytorch.org/whl/torch_stable.html
 numpy==1.20.1
 torch==1.7.1
 scipy==1.6.1
