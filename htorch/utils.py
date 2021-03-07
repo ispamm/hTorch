@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import re
 import sys
 from .functions import *
+import torch.fx
 
 grayscale = torchvision.transforms.Grayscale(num_output_channels=1)
 
@@ -38,60 +39,92 @@ def apply_quaternion_gradient(model, layers):
     
     return model
 
-def convert_to_quaternion(Net, spinor=False):
+def convert_to_quaternion(Net, verbose=False, spinor=False):
     """
     converts a real_valued initialized Network to a quaternion one
     
     @type Net: nn.Module
+    @type verbose: bool
     @type spinor: bool
     """
     last_module = len([mod for mod in Net.children()])
     layers = ["Linear","Conv1d", "Conv2d","Conv3d",
                     "ConvTranspose1d", "ConvTranspose2d", "ConvTranspose3d"]
     for n, (name, layer) in enumerate(Net.named_children()):
-        
         layer_name = re.match("^\w+", str(layer)).group()
-        if layer_name == "Linear" and n != last_module-1:
-            
-            params = re.findall("(?<==)\w+", str(layer))
-            in_features, out_features, bias = int(params[0]), int(params[1]), bool(params[2])
-            
-            assert in_features % 4 == 0, "number of in_channels must be divisible by 4"
-            assert out_features % 4 == 0, "number of out_channels must be divisible by 4"
-            
-            quaternion_weight = initialize_linear(in_features, out_features)
-            
-            if spinor:
-                weight = quaternion_weight._real_rot_repr
-            else:
-                weight = quaternion_weight._real_repr
-            
-            getattr(Net, name).weight = nn.Parameter(weight)
-            
-            if getattr(Net, name).bias != None:
-                getattr(Net, name).bias.data.zero_()
         
-        if layer_name in ["Conv1d", "Conv2d","Conv3d",
-                          "ConvTranspose1d", "ConvTranspose2d", "ConvTranspose3d"] and n != last_module-1:
-            
-            params = re.findall("(?<!\w)\d+(?<=\w)", str(layer))
-            in_features, out_features, kernel_size, stride = \
-            int(params[0]), int(params[1]), (int(params[2]),int(params[3])) , (int(params[4]),int(params[5]))
-            
-            assert in_features % 4 == 0, "number of in_channels must be divisible by 4"
-            assert out_features % 4 == 0, "number of out_channels must be divisible by 4"
-            
-            quaternion_weight = initialize_conv(in_features, out_features, kernel_size)
-            
+        if n != last_module-1:
+            if layer_name in layers[1:]:
+
+                params = re.findall("(?<!\w)\d+(?<=\w)", str(layer))
+                in_features, out_features, kernel_size, stride = \
+                int(params[0]), int(params[1]), (int(params[2]),int(params[3])) , (int(params[4]),int(params[5]))
+
+                assert in_features % 4 == 0, "number of in_channels must be divisible by 4"
+                assert out_features % 4 == 0, "number of out_channels must be divisible by 4"
+
+                init_func = initialize_conv
+                args = (in_features // 4, out_features // 4, kernel_size)
+
+            if layer_name == layers[0]:
+
+                params = re.findall("(?<==)\w+", str(layer))
+                in_features, out_features, bias = int(params[0]), int(params[1]), bool(params[2])
+
+                assert in_features % 4 == 0, "number of in_channels must be divisible by 4"
+                assert out_features % 4 == 0, "number of out_channels must be divisible by 4"
+
+                init_func = initialize_linear
+                args = (in_features // 4, out_features // 4)
+
+            quaternion_weight = init_func(*args)
+
             if spinor:
                 weight = quaternion_weight._real_rot_repr
             else:
                 weight = quaternion_weight._real_repr
-            
+
             getattr(Net, name).weight = nn.Parameter(weight)
-            
             if getattr(Net, name).bias != None:
-                getattr(Net, name).bias.data.zero_()
-    
-    return Net
+                getattr(Net, name).bias = nn.Parameter(torch.zeros(out_features))
                 
+            traced = torch.fx.symbolic_trace(layer)
+
+            
+            for node in traced.graph.nodes:
+                if node.op == 'placeholder':
+                    with traced.graph.inserting_after(node):
+                        
+                        new_node = traced.graph.call_function(
+                            check_shapes, args=(node,))
+            
+                        
+                
+                if any(lay in node.name for lay in ["conv", "lin"]):
+                    with traced.graph.inserting_before(node):
+                        all_nodes = [node for node in traced.graph.nodes]
+                        new_node = traced.graph.call_function(node.target, 
+                                                              (all_nodes[1], *node.args[1:]), node.kwargs)
+                        node.replace_all_uses_with(new_node)
+                    traced.graph.erase_node(node)
+
+                if node.op == 'output':
+                    all_nodes = [node for node in traced.graph.nodes]
+                    with traced.graph.inserting_before(node):
+                        
+                        new_node = traced.graph.call_function(
+                            Q, args=(node.prev,))
+                        node.replace_all_uses_with(new_node)
+                    traced.graph.erase_node(node)
+                    with traced.graph.inserting_after(node):
+                        
+                        new_node = traced.graph.output(node.prev,)
+                    
+            if verbose:
+                print("-"*20, layer_name, "-"*20, sep="\n")
+                print(torch.fx.GraphModule(layer, traced.graph))
+                
+            traced.graph.lint()
+            setattr(Net, name, torch.fx.GraphModule(layer, traced.graph))
+
+    return Net
