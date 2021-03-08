@@ -86,7 +86,7 @@ class QConv1d(nn.Module):
             self.bias = None
 
     def forward(self, x):
-        if len(x.shape) == 5:
+        if x.dim() == 5:
             x = torch.cat([*x.chunk()], 2).squeeze()
         return Q(F.conv1d(x, self.weight, self.bias, self.stride,
                         self.padding, self.dilation, self.groups))
@@ -141,7 +141,7 @@ class QConv2d(nn.Module):
             self.bias = None
 
     def forward(self, x):
-        if len(x.shape) == 5:
+        if x.dim() == 5:
             x = torch.cat([*x.chunk()], 2).squeeze()
         return Q(F.conv2d(x, self.weight, self.bias, self.stride,
                                   self.padding, self.dilation, self.groups))
@@ -196,7 +196,7 @@ class QConv3d(nn.Module):
             self.bias = None
 
     def forward(self, x):
-        if len(x.shape) == 5:
+        if x.dim() == 5:
             x = torch.cat([*x.chunk()], 2).squeeze()
         return Q(F.conv3d(x, self.weight, self.bias, self.stride,
                         self.padding, self.dilation, self.groups))
@@ -233,7 +233,7 @@ class QLinear(nn.Module):
             self.bias = None
 
     def forward(self, x):
-        if len(x.shape) == 3:
+        if x.dim() == 3:
             x = torch.cat([*x.chunk()], 2).squeeze()
         return Q(F.linear(x, self.weight, self.bias))
 
@@ -289,7 +289,7 @@ class QConvTranspose1d(nn.Module):
             self.bias = None
 
     def forward(self, x):
-        if len(x.shape) == 5:
+        if x.dim() == 5:
             x = torch.cat([*x.chunk()], 2).squeeze()
         return Q(F.conv_transpose1d(x, self.weight, self.bias, self.stride,
                                   self.padding, self.output_padding, self.groups, self.dilation))
@@ -347,7 +347,7 @@ class QConvTranspose2d(nn.Module):
             self.bias = None
 
     def forward(self, x):
-        if len(x.shape) == 5:
+        if x.dim() == 5:
             x = torch.cat([*x.chunk()], 2).squeeze()
         return Q(F.conv_transpose2d(x, self.weight, self.bias, self.stride,
                                   self.padding, self.output_padding, self.groups, self.dilation))
@@ -403,7 +403,7 @@ class QConvTranspose3d(nn.Module):
             self.bias = None
 
     def forward(self, x):
-        if len(x.shape) == 5:
+        if x.dim() == 5:
             x = torch.cat([*x.chunk()], 2).squeeze()
         return Q(F.conv_transpose3d(x, self.weight, self.bias, self.stride,
                                   self.padding, self.output_padding, self.groups, self.dilation))
