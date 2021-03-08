@@ -57,9 +57,9 @@ model = torch.nn.Sequential(
 
 ## Code organization
 
-1. The `QuaternionTensor` class is defined in [htorch/quaternion.py].
-2. Layers for building quaternion-valued NN are found in [htorch/layers.py].
-3. A few utilities to load real-valued datasets or convert existing real-valued models can be found in [htorch/utils.py].
+1. The `QuaternionTensor` class is defined in [htorch/quaternion.py](htorch/quaternion.py).
+2. Layers for building quaternion-valued NN are found in [htorch/layers.py](htorch/layers.py).
+3. A few utilities to load real-valued datasets or convert existing real-valued models can be found in [htorch/utils.py](htorch/utils.py).
 
 Most operations are documented in the [example notebooks](./notebooks/).
 
