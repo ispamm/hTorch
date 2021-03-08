@@ -39,6 +39,12 @@ def apply_quaternion_gradient(model, layers):
     
     return model
 
+@torch.fx.wrap
+def check_shapes(x):
+    if x.dim() in [3, 5]:
+        x = torch.cat([*x.chunk()], 2).squeeze()
+    return x
+
 def convert_to_quaternion(Net, verbose=False, spinor=False):
     """
     converts a real_valued initialized Network to a quaternion one
@@ -66,7 +72,7 @@ def convert_to_quaternion(Net, verbose=False, spinor=False):
                 init_func = initialize_conv
                 args = (in_features // 4, out_features // 4, kernel_size)
 
-            if layer_name == layers[0]:
+            elif layer_name == layers[0]:
 
                 params = re.findall("(?<==)\w+", str(layer))
                 in_features, out_features, bias = int(params[0]), int(params[1]), bool(params[2])
@@ -77,6 +83,9 @@ def convert_to_quaternion(Net, verbose=False, spinor=False):
                 init_func = initialize_linear
                 args = (in_features // 4, out_features // 4)
 
+            else:
+                continue
+                
             quaternion_weight = init_func(*args)
 
             if spinor:
