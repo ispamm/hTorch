@@ -41,9 +41,29 @@ x = x * torch.rand(2) # Multiply with real-valued scalars
 x.norm.sum().backward() # Take the absolute value, sum, and take the gradient
 ```
 
-We also provide layers and utilities to work with PyTorch modules. See the [Basic notebook](notebooks/basic.ipynb) for an introduction to the basic concepts in the library, and the [Training notebook](notebooks/training.ipynb) for an example of training a quaternion-valued CNN.
+We also provide layers and utilities to work with PyTorch modules, e.g.:
 
-# Testing
+```python
+model = torch.nn.Sequential(
+    layers.QLinear(10, 20),
+    torch.nn.ReLU(),
+    layers.QLinear(20, 10),
+    layers.QuaternionToReal(10), # Take the absolute value in output
+)
+```
+
+ See the [Basic notebook](notebooks/basic.ipynb) for an introduction to the basic concepts in the library, and the [Training notebook](notebooks/training.ipynb) for an example of training a quaternion-valued CNN.
+
+
+## Code organization
+
+1. The `QuaternionTensor` class is defined in [htorch/quaternion.py].
+2. Layers for building quaternion-valued NN are found in [htorch/layers.py].
+3. A few utilities to load real-valued datasets or convert existing real-valued models can be found in [htorch/utils.py].
+
+Most operations are documented in the [example notebooks](./notebooks/).
+
+## Testing
 
 To manually run the unit tests:
 
