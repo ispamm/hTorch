@@ -38,7 +38,7 @@ We provide a number of operations from quaternion algebra and inter-operability 
 
 ```python
 x = x * torch.rand(2) # Multiply with real-valued scalars
-x.norm.sum().backward() # Take the absolute value, sum, and take the gradient
+x.norm().sum().backward() # Take the absolute value, sum, and take the gradient
 ```
 
 We also provide layers and utilities to work with PyTorch modules, e.g.:
