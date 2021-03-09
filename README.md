@@ -5,7 +5,7 @@
 
 ![](coverage.svg)
 
-> :warning: **this is still heavily experimental**. Use at your own discretion!
+> :warning: **this is still heavily experimental**. Use at your own discretion! 
 
 This repository contains code to extend PyTorch for use in quaternion-valued applications. We provide quaternion-valued tensors, layers, and examples. Code is designed to be as inter-operable as possible with basic real-valued PyTorch tensors and operations.
 
