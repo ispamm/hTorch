@@ -225,3 +225,15 @@ class QLinearAutograd(torch.autograd.Function):
             grad_input_bias = grad_output.sum(0)
                 
         return grad_input_r, grad_input_bias
+    
+class QModReLU(torch.nn.Module):
+    """
+    Quaternion ModeReLU
+    """
+    def __init__(self, bias=0):
+        super().__init__()
+        self.bias = torch.nn.Parameter(torch.Tensor([bias]))
+
+    def forward(self, x):
+        norm = x.norm()
+        return F.relu(norm + self.bias) * (x / norm) 
