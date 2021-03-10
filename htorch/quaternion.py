@@ -432,6 +432,10 @@ def log(input):
 
 # ----------------------------------- layers ------------------------------------------------
 
+@implements(torch.nn.functional.max_pool2d)
+def max_pool2d(input, *args, **kwargs):
+    return torch.nn.functional.max_pool2d(input.q, *args, **kwargs)
+
 @implements(torch.conv1d)
 def conv1d(input, *args, **kwargs):
     return torch.conv1d(input.q, *args, **kwargs)
