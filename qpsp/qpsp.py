@@ -2,6 +2,7 @@ import pytorch_lightning as pl
 from htorch.layers import QConv2d
 from htorch.functions import QModReLU
 import torch
+import torch.nn as nn
 
 from .madgrad import MADGRAD
 from .qresnet import resnet50, resnet101, resnet152

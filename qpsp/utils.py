@@ -2,8 +2,6 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 
-import .constants
-
 def plot_RGB(input):
     img = torch.zeros(tuple([input.shape[1]]) + tuple([input.shape[2]]) + tuple([3]))
     img[:, :, 0] = input[4]

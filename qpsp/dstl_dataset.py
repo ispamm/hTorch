@@ -6,7 +6,7 @@ from shapely.wkt import loads as wkt_loads
 from shapely.geometry import MultiPolygon, Polygon
 import pytorch_lightning as pl
 
-from constants import *
+from .constants import *
 
 file_names = pd.read_csv("train_wkt_v4.csv").ImageId.unique()
 
