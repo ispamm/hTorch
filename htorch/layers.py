@@ -469,10 +469,10 @@ class QBatchNorm2d(nn.Module):
 
         if self.track_running_stats:
             self.register_buffer('running_mean', torch.zeros(4, in_channels // 4))
-            self.register_buffer('running_invsq_cov', torch.zeros(in_channels // 4, 4, 4))
+            self.register_buffer('running_cov', torch.zeros(in_channels // 4, 4, 4))
         else:
             self.register_parameter('running_mean', None)
-            self.register_parameter('running_invsq_cov', None)
+            self.register_parameter('running_cov', None)
         
         self.momentum = momentum
 
@@ -481,7 +481,7 @@ class QBatchNorm2d(nn.Module):
     def reset_running_stats(self):
         if self.track_running_stats:
             self.running_mean.zero_()
-            self.running_invsq_cov.zero_()
+            self.running_cov.zero_()
 
     def reset_parameters(self):
         self.reset_running_stats()
@@ -510,23 +510,23 @@ class QBatchNorm2d(nn.Module):
         if self.training:
             perm = x.permute(2, 0, *axes).flatten(2, -1)
             cov = torch.matmul(perm, perm.transpose(-1, -2)) / perm.shape[-1]
-            ell = torch.cholesky(cov + self.eye, upper=True)
 
-            if self.running_invsq_cov is not None:
+            if self.running_cov is not None:
                 with torch.no_grad():
-                    self.running_invsq_cov = self.momentum * self.running_invsq_cov +\
-                                             (1.0 - self.momentum) * ell
+                    self.running_cov = self.momentum * self.running_cov +\
+                                             (1.0 - self.momentum) * cov
 
         else:
-            invsq_cov = self.running_invsq_cov
-
+            cov = self.running_cov
+        
+        ell = torch.cholesky(cov + self.eye, upper=True)
         soln = torch.triangular_solve(
             x.unsqueeze(-1).permute(*range(1, x.dim()), 0, -1),
             ell.reshape(*shape, d, d)
         )
 
-        invsq_cov = soln.solution.squeeze(-1)
-        z = torch.stack(torch.unbind(invsq_cov, dim=-1), dim=0)
+        cov = soln.solution.squeeze(-1)
+        z = torch.stack(torch.unbind(cov, dim=-1), dim=0)
         
         if self.affine:
             weight = self.weight.view(4, 4, *shape)
