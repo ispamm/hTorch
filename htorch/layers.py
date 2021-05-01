@@ -435,6 +435,8 @@ class QMaxPool2d(nn.Module):
 class QBatchNorm2d(nn.Module):
     """
     Quaternion batch normalization 2d
+
+    please check whitendxd in cplx module at https://github.com/ivannz
     """
 
     def __init__(self,
@@ -525,8 +527,8 @@ class QBatchNorm2d(nn.Module):
             ell.reshape(*shape, d, d)
         )
 
-        cov = soln.solution.squeeze(-1)
-        z = torch.stack(torch.unbind(cov, dim=-1), dim=0)
+        wht = soln.solution.squeeze(-1)
+        z = torch.stack(torch.unbind(wht, dim=-1), dim=0)
         
         if self.affine:
             weight = self.weight.view(4, 4, *shape)
