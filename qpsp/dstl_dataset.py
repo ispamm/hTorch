@@ -5,6 +5,8 @@ import tifffile as tiff
 from shapely.wkt import loads as wkt_loads
 from shapely.geometry import MultiPolygon, Polygon
 import pytorch_lightning as pl
+import cv2
+import random 
 
 from .constants import *
 
@@ -119,7 +121,7 @@ def RandomHorizontalFlip(img, mask):
     return img, mask
 
 
-class LitDSTL(pl.LightningModule):
+class LitDSTL(pl.LightningDataModule):
 
     def __init__(self):
         super().__init__()
@@ -130,16 +132,19 @@ class LitDSTL(pl.LightningModule):
         ]
 
     def train_dataloader(self):
-        train = DSTLDataset(file_names_train, transform=self.transform)
+        repeated = np.repeat(file_names_train, REPETITIONS)
+        random.shuffle(repeated)
+        
+        train = DSTLDataset(repeated, transform=self.transform)
         loader = torch.utils.data.DataLoader(train, batch_size=BATCH_SIZE, shuffle=SHUFFLE, pin_memory=True,
                                              num_workers=0)
         return loader
 
     def val_dataloader(self):
-        val = DSTLDataset(file_names_val)
+        val = DSTLDataset(file_names_val, transform=self.transform)
         return torch.utils.data.DataLoader(val, batch_size=1, shuffle=SHUFFLE, pin_memory=True, num_workers=0)
 
     def test_dataloader(self):
-        test = DSTLDataset(file_names_test)
-        return torch.utils.data.DataLoader(test, batch_size=1, shuffle=SHUFFLE, pin_memory=True, num_workers=0)
+        test = DSTLDataset(file_names_test, transform=self.transform)
+        return torch.utils.data.DataLoader(test, batch_size=BATCH_SIZE, shuffle=SHUFFLE, pin_memory=True, num_workers=0)
 

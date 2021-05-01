@@ -1,5 +1,9 @@
 import pydensecrf.densecrf as dcrf
 import pydensecrf.utils as utils
+import numpy as np
+
+from .constants import *
+from .utils import to_rgb
 
 def dense_crf(img, output_probs):
     c = output_probs.shape[0]
@@ -10,11 +14,12 @@ def dense_crf(img, output_probs):
     U = np.ascontiguousarray(U)
 
     img = np.ascontiguousarray(img)
+    rgb = to_rgb(img)
 
     d = dcrf.DenseCRF2D(w, h, c)
     d.setUnaryEnergy(U)
     d.addPairwiseGaussian(sxy=POS_XY_STD, compat=POS_W)
-    d.addPairwiseBilateral(sxy=BI_XY_STD, srgb=BI_RGB_STD, rgbim=img, compat=BI_W)
+    d.addPairwiseBilateral(sxy=BI_XY_STD, srgb=BI_RGB_STD, rgbim=rgb, compat=BI_W)
 
     Q = d.inference(MAX_ITER)
     Q = np.array(Q).reshape((c, h, w))

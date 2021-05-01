@@ -3,11 +3,17 @@ from htorch.layers import QConv2d
 from htorch.functions import QModReLU
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+import numpy as np
 
 from .madgrad import MADGRAD
 from .qresnet import resnet50, resnet101, resnet152
 from .loss import FocalTverskyLoss
 from .utils import f1_score
+from .constants import *
+from .crf import dense_crf_wrapper
+
+
 
 class PPM(torch.nn.Module):
     def __init__(self, in_dim, reduction_dim, bins):
@@ -31,8 +37,8 @@ class PPM(torch.nn.Module):
 
 
 class PSPNet(pl.LightningModule):
-    def __init__(self, layers=50, bins=(1, 2, 3, 6), dropout=0.1, classes=10, zoom_factor=8, use_ppm=False,
-                 pretrained=False):
+    def __init__(self, layers=50, bins=(1, 2, 3, 6), dropout=0.1, classes=10, zoom_factor=8, use_ppm=True,
+                 pretrained=False, training=True):
         super(PSPNet, self).__init__()
         assert layers in [50, 101, 152]
         assert 2048 % len(bins) == 0
@@ -40,7 +46,6 @@ class PSPNet(pl.LightningModule):
         assert zoom_factor in [1, 2, 4, 8]
         self.zoom_factor = zoom_factor
         self.use_ppm = use_ppm
-        self.criterion = FocalTverskyLoss()
 
         if layers == 50:
             resnet = resnet50(pretrained=pretrained)
@@ -84,6 +89,7 @@ class PSPNet(pl.LightningModule):
             )
 
     def forward(self, x, y=None):
+
         x_size = x.size()
         h = int(x_size[2] / 8 * self.zoom_factor)
         w = int(x_size[3] / 8 * self.zoom_factor)
@@ -100,38 +106,54 @@ class PSPNet(pl.LightningModule):
         x = self.cls(x)
         if self.zoom_factor != 1:
             x = F.interpolate(x, size=(h, w), mode='bilinear', align_corners=True)
-
         if self.training:
+          
             aux = self.aux(x_tmp)
             if self.zoom_factor != 1:
                 aux = F.interpolate(aux, size=(h, w), mode='bilinear', align_corners=True)
-            main_loss, f1 = self.focal_tversky_loss(x, y)
-            aux_loss, _ = self.focal_tversky_loss(aux, y)
-            return x, main_loss, aux_loss, f1
+            main_loss = self.focal_tversky_loss(x, y)
+            aux_loss = self.focal_tversky_loss(aux, y)
+            return x, main_loss, aux_loss
         else:
             return x
 
     def configure_optimizers(self):
-        optimizer = MADGRAD(model.parameters(), lr=LR)
+        optimizer = MADGRAD(self.parameters(), lr=LEARNING_RATE)
         return optimizer
 
     def focal_tversky_loss(self, x, y):
-        loss, f1 = self.criterion(x, y)
-        return loss, f1
+        loss = FocalTverskyLoss()(x, y)
+        return loss
 
     def training_step(self, train_batch, batch_idx):
         inputs, labels = train_batch
-        outputs, main_loss, aux_loss = self.forward(inputs.to(device), labels.to(device))       
+        outputs, main_loss, aux_loss = self.forward(inputs, labels) 
+
+        probs = torch.sigmoid(outputs).data.cpu().numpy()
+        crf = np.stack(list(map(dense_crf_wrapper, zip(inputs.cpu().numpy(), probs))))
+        crf = np.ascontiguousarray(crf)
+        f1_crf = f1_score(torch.from_numpy(crf).to(self.device), labels)
+
         loss = main_loss + ALPHA_AUX * aux_loss
         f1 = f1_score(outputs, labels)
+
         self.log('train_loss', loss)
         self.log('train_f1', f1)
+        self.log('train_f1_crf', f1_crf)
         return loss
 
     def validation_step(self, val_batch, batch_idx):
         inputs, labels = val_batch
-        outputs = self.forward(inputs.to(device), labels.to(device))
-        loss = self.focal_tversky_loss(outputs.float(), labels.to(device).float())
+        outputs = self.forward(inputs, labels)
+
+        probs = torch.sigmoid(outputs).data.cpu().numpy()
+        crf = np.stack(list(map(dense_crf_wrapper, zip(inputs.cpu().numpy(), probs))))
+        crf = np.ascontiguousarray(crf)
+        f1_crf = f1_score(torch.from_numpy(crf).to(self.device), labels)
+
+        loss = self.focal_tversky_loss(outputs.float(), labels.float())
         f1 = f1_score(outputs, labels)
+
         self.log('val_loss', loss)
+        self.log('val_f1_crf', f1_crf)
         self.log('val_f1', f1)

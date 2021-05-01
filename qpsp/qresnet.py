@@ -1,5 +1,6 @@
 import torch 
 import torch.nn as nn
+import torch.nn.functional as F
 
 from htorch.quaternion import *
 from htorch.layers import QConv2d
