@@ -1,0 +1,30 @@
+# Dataset options
+BATCH_SIZE = 2
+REPETITIONS = 200
+SHUFFLE = False
+TRAIN_SPLIT = 0.6
+TEST_SPLIT = 0.5
+
+# Training options
+DEEP_SUPERVISION = False
+DATA_SIZE_TRAIN = 1000
+DATA_SIZE_VAL = 100
+DROPOUT = 0.1
+CLASSES = 10
+LAYERS = 101
+LEARNING_RATE = 3e-4
+NUM_EPOCHS = 20
+ALPHA_AUX = 0
+
+# Loss parameters
+ALPHA = 0.7
+BETA = 0.3
+GAMMA = 0.75
+
+# CRF parameters
+MAX_ITER = 2
+POS_W = 3
+POS_XY_STD = 3
+BI_XY_STD = 3
+BI_RGB_STD = 3
+BI_W = 3
