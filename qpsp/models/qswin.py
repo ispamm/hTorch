@@ -22,6 +22,12 @@ from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 from timm.models.registry import register_model
 from timm.models.vision_transformer import checkpoint_filter_fn, Mlp, PatchEmbed, _init_vit_weights
 
+from ..madgrad import MADGRAD
+from ..loss import FocalTverskyLoss
+from ..utils import f1_score
+from ..constants import *
+from ..crf import dense_crf_wrapper
+
 _logger = logging.getLogger(__name__)
 
 
@@ -417,7 +423,7 @@ class BasicLayer(nn.Module):
         return f"dim={self.dim}, input_resolution={self.input_resolution}, depth={self.depth}"
 
 
-class SwinTransformer(nn.Module):
+class SwinTransformer(pl.LightningModule):
     r""" Swin Transformer
         A PyTorch impl of : `Swin Transformer: Hierarchical Vision Transformer using Shifted Windows`  -
           https://arxiv.org/pdf/2103.14030
@@ -531,6 +537,47 @@ class SwinTransformer(nn.Module):
         x = self.forward_features(x)
         x = self.head(x)
         return x
+    
+    def configure_optimizers(self):
+        optimizer = MADGRAD(self.parameters(), lr=LEARNING_RATE)
+        return optimizer
+
+    def focal_tversky_loss(self, x, y):
+        loss = FocalTverskyLoss()(x, y)
+        return loss
+
+    def training_step(self, train_batch, batch_idx):
+        inputs, labels = train_batch
+        outputs = self.forward(inputs, labels) 
+
+        probs = torch.sigmoid(outputs).data.cpu().numpy()
+        crf = np.stack(list(map(dense_crf_wrapper, zip(inputs.cpu().numpy(), probs))))
+        crf = np.ascontiguousarray(crf)
+        f1_crf = f1_score(torch.from_numpy(crf).to(self.device), labels)
+
+        loss =  self.focal_tversky_loss(outputs.float(), labels.float())
+        f1 = f1_score(outputs, labels)
+
+        self.log('train_loss', loss)
+        self.log('train_f1', f1)
+        self.log('train_f1_crf', f1_crf)
+        return loss
+
+    def validation_step(self, val_batch, batch_idx):
+        inputs, labels = val_batch
+        outputs = self.forward(inputs, labels)
+
+        probs = torch.sigmoid(outputs).data.cpu().numpy()
+        crf = np.stack(list(map(dense_crf_wrapper, zip(inputs.cpu().numpy(), probs))))
+        crf = np.ascontiguousarray(crf)
+        f1_crf = f1_score(torch.from_numpy(crf).to(self.device), labels)
+
+        loss = self.focal_tversky_loss(outputs.float(), labels.float())
+        f1 = f1_score(outputs, labels)
+
+        self.log('val_loss', loss)
+        self.log('val_f1_crf', f1_crf)
+        self.log('val_f1', f1)
 
 
 def _create_swin_transformer(variant, pretrained=False, default_cfg=None, **kwargs):
@@ -554,6 +601,7 @@ def _create_swin_transformer(variant, pretrained=False, default_cfg=None, **kwar
         **kwargs)
 
     return model
+
 
 
 
