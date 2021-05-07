@@ -86,7 +86,7 @@ class DSTLDataset(torch.utils.data.Dataset):
                 self.seed += 1
             else:
                 x = torch.from_numpy(x)
-                y = torch.from_numpy(y)[:, :256, :256]
+                y = torch.from_numpy(y)[:, :224, :224]
 
             if index != len(self.id_list) - 1:
                 index += 1

@@ -18,9 +18,9 @@ import torch.utils.checkpoint as checkpoint
 
 from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from timm.models.helpers import build_model_with_cfg, overlay_external_default_cfg
-from timm.models.layers import DropPath, to_2tuple, trunc_normal_
+from timm.models.layers import PatchEmbed, Mlp, DropPath, to_2tuple, trunc_normal_
 from timm.models.registry import register_model
-from timm.models.vision_transformer import checkpoint_filter_fn, Mlp, PatchEmbed, _init_vit_weights
+from timm.models.vision_transformer import checkpoint_filter_fn, _init_vit_weights
 
 from ..madgrad import MADGRAD
 from ..loss import FocalTverskyLoss
@@ -30,6 +30,9 @@ from ..crf import dense_crf_wrapper
 
 _logger = logging.getLogger(__name__)
 
+act = nn.GELU
+lin = nn.Linear
+factor = 1
 
 def set_ops(quaternion):
     global lin, act, factor
@@ -37,6 +40,8 @@ def set_ops(quaternion):
     act = QModReLU if quaternion else nn.GELU
     factor = 4
 
+
+_logger = logging.getLogger(__name__)
 
 def _cfg(url='', **kwargs):
     return {
@@ -99,6 +104,7 @@ def window_partition(x, window_size: int):
     Args:
         x: (B, H, W, C)
         window_size (int): window size
+
     Returns:
         windows: (num_windows*B, window_size, window_size, C)
     """
@@ -115,6 +121,7 @@ def window_reverse(windows, window_size: int, H: int, W: int):
         window_size (int): Window size
         H (int): Height of image
         W (int): Width of image
+
     Returns:
         x: (B, H, W, C)
     """
@@ -127,6 +134,7 @@ def window_reverse(windows, window_size: int, H: int, W: int):
 class WindowAttention(nn.Module):
     r""" Window based multi-head self attention (W-MSA) module with relative position bias.
     It supports both of shifted and non-shifted window.
+
     Args:
         dim (int): Number of input channels.
         window_size (tuple[int]): The height and width of the window.
@@ -163,9 +171,9 @@ class WindowAttention(nn.Module):
         relative_position_index = relative_coords.sum(-1)  # Wh*Ww, Wh*Ww
         self.register_buffer("relative_position_index", relative_position_index)
 
-        self.qkv = lin(dim, dim * 3, bias=qkv_bias)
+        self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
         self.attn_drop = nn.Dropout(attn_drop)
-        self.proj = lin(dim, dim)
+        self.proj = nn.Linear(dim, dim)
         self.proj_drop = nn.Dropout(proj_drop)
 
         trunc_normal_(self.relative_position_bias_table, std=.02)
@@ -205,8 +213,9 @@ class WindowAttention(nn.Module):
         return x
 
 
-class SwinTransformerBlock(nn.Module):
+class SwinTransformerBlock(pl.LightningModule):
     r""" Swin Transformer Block.
+
     Args:
         dim (int): Number of input channels.
         input_resolution (tuple[int]): Input resulotion.
@@ -316,6 +325,7 @@ class SwinTransformerBlock(nn.Module):
 
 class PatchMerging(nn.Module):
     r""" Patch Merging Layer.
+
     Args:
         input_resolution (tuple[int]): Resolution of input feature.
         dim (int): Number of input channels.
@@ -326,7 +336,7 @@ class PatchMerging(nn.Module):
         super().__init__()
         self.input_resolution = input_resolution
         self.dim = dim
-        self.reduction = lin(4 * dim, 2 * dim, bias=False)
+        self.reduction = nn.Linear(4 * dim, 2 * dim, bias=False)
         self.norm = norm_layer(4 * dim)
 
     def forward(self, x):
@@ -364,6 +374,7 @@ class PatchMerging(nn.Module):
 
 class BasicLayer(nn.Module):
     """ A basic Swin Transformer layer for one stage.
+
     Args:
         dim (int): Number of input channels.
         input_resolution (tuple[int]): Input resolution.
@@ -427,6 +438,7 @@ class SwinTransformer(pl.LightningModule):
     r""" Swin Transformer
         A PyTorch impl of : `Swin Transformer: Hierarchical Vision Transformer using Shifted Windows`  -
           https://arxiv.org/pdf/2103.14030
+
     Args:
         img_size (int | tuple(int)): Input image size. Default 224
         patch_size (int | tuple(int)): Patch size. Default: 4
@@ -469,7 +481,7 @@ class SwinTransformer(pl.LightningModule):
             img_size=img_size, patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim,
             norm_layer=norm_layer if self.patch_norm else None)
         num_patches = self.patch_embed.num_patches
-        self.patch_grid = self.patch_embed.patch_grid
+        self.patch_grid = self.patch_embed.grid_size
 
         # absolute position embedding
         if self.ape:
@@ -504,7 +516,7 @@ class SwinTransformer(pl.LightningModule):
 
         self.norm = norm_layer(self.num_features)
         self.avgpool = nn.AdaptiveAvgPool1d(1)
-        self.head = conv(self.num_features, num_classes) if num_classes > 0 else nn.Identity()
+        self.head = nn.Conv2d(self.num_features, num_classes, kernel_size=(3,3)) if num_classes > 0 else nn.Identity()
 
         assert weight_init in ('jax', 'jax_nlhb', 'nlhb', '')
         head_bias = -math.log(self.num_classes) if 'nlhb' in weight_init else 0.
@@ -532,12 +544,12 @@ class SwinTransformer(pl.LightningModule):
         x = self.avgpool(x.transpose(1, 2))  # B C 1
         x = torch.flatten(x, 1)
         return x
-
+    
     def forward(self, x):
         x = self.forward_features(x)
         x = self.head(x)
         return x
-    
+
     def configure_optimizers(self):
         optimizer = MADGRAD(self.parameters(), lr=LEARNING_RATE)
         return optimizer
@@ -548,7 +560,7 @@ class SwinTransformer(pl.LightningModule):
 
     def training_step(self, train_batch, batch_idx):
         inputs, labels = train_batch
-        outputs = self.forward(inputs, labels) 
+        outputs = self.forward(inputs) 
 
         probs = torch.sigmoid(outputs).data.cpu().numpy()
         crf = np.stack(list(map(dense_crf_wrapper, zip(inputs.cpu().numpy(), probs))))
@@ -565,7 +577,7 @@ class SwinTransformer(pl.LightningModule):
 
     def validation_step(self, val_batch, batch_idx):
         inputs, labels = val_batch
-        outputs = self.forward(inputs, labels)
+        outputs = self.forward(inputs)
 
         probs = torch.sigmoid(outputs).data.cpu().numpy()
         crf = np.stack(list(map(dense_crf_wrapper, zip(inputs.cpu().numpy(), probs))))
@@ -601,7 +613,6 @@ def _create_swin_transformer(variant, pretrained=False, default_cfg=None, **kwar
         **kwargs)
 
     return model
-
 
 
 
