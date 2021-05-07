@@ -6,7 +6,7 @@ from htorch.quaternion import *
 from htorch.layers import QConv2d
 from htorch.functions import QModReLU
 
-def set_ops(quaternion)
+def set_ops(quaternion):
     global conv, act, factor
     conv = QConv2d if quaternion else nn.Conv2d
     act = QModReLU if quaternion else nn.ReLU
@@ -183,8 +183,7 @@ def resnet18(pretrained=False, quaternion=True, **kwargs):
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
-    global conv
-    conv = QConv2d if quaternion
+    set_ops(quaternion)
 
     model = ResNet(BasicBlock, [2, 2, 2, 2], **kwargs)
     if pretrained:
@@ -197,8 +196,7 @@ def resnet34(pretrained=False, quaternion=True, **kwargs):
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
-    global conv
-    conv = QConv2d if quaternion
+    set_ops(quaternion)
 
     model = ResNet(BasicBlock, [3, 4, 6, 3], **kwargs)
     if pretrained:
@@ -211,8 +209,7 @@ def resnet50(pretrained=False,  quaternion=True, **kwargs):
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
-    global conv
-    conv = QConv2d if quaternion
+    set_ops(quaternion)
 
     model = ResNet(Bottleneck, [3, 4, 6, 3], **kwargs)
     if pretrained:
@@ -226,8 +223,7 @@ def resnet101(pretrained=False, quaternion=True, **kwargs):
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
-    global conv
-    conv = QConv2d if quaternion
+    set_ops(quaternion)
 
     model = ResNet(Bottleneck, [3, 4, 23, 3], **kwargs)
     if pretrained:
@@ -241,8 +237,7 @@ def resnet152(pretrained=False, quaternion=True, **kwargs):
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
-    global conv
-    conv = QConv2d if quaternion
+    set_ops(quaternion)
 
     model = ResNet(Bottleneck, [3, 8, 36, 3], **kwargs)
     if pretrained:

@@ -7,13 +7,13 @@ import torch.nn.functional as F
 import numpy as np
 
 from ..madgrad import MADGRAD
-from ..qresnet import resnet50, resnet101, resnet152
+from .qresnet import resnet50, resnet101, resnet152
 from ..loss import FocalTverskyLoss
 from ..utils import f1_score
 from ..constants import *
 from ..crf import dense_crf_wrapper
 
-def set_ops(quaternion)
+def set_ops(quaternion):
     global conv, act, factor
     conv = QConv2d if quaternion else nn.Conv2d
     act = QModReLU if quaternion else nn.ReLU

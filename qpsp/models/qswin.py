@@ -31,7 +31,7 @@ from ..crf import dense_crf_wrapper
 _logger = logging.getLogger(__name__)
 
 
-def set_ops(quaternion)
+def set_ops(quaternion):
     global lin, act, factor
     lin = QLinear if quaternion else nn.Linear
     act = QModReLU if quaternion else nn.GELU
