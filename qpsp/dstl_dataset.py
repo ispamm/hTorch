@@ -79,14 +79,13 @@ class DSTLDataset(torch.utils.data.Dataset):
 
             y = np.stack(msk_stack, 2).transpose(2, 0, 1)
             if self.transform:
-
                 for transf in self.transform:
                     np.random.seed(self.seed)
                     x, y = transf(x, y)
                 self.seed += 1
             else:
                 x = torch.from_numpy(x)
-                y = torch.from_numpy(y)[:, :224, :224]
+                y = torch.from_numpy(y)
 
             if index != len(self.id_list) - 1:
                 index += 1
@@ -97,7 +96,7 @@ class DSTLDataset(torch.utils.data.Dataset):
 
 
 
-def RandomCrop(img, mask, size=(256, 256)):
+def RandomCrop(img, mask, size=(WIDTH, HEIGHT)):
     width, height = size
     x = random.randint(0, img.shape[-1] - width)
     y = random.randint(0, img.shape[-2] - height)

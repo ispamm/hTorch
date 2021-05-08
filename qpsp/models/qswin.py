@@ -12,6 +12,7 @@ import math
 from copy import deepcopy
 from typing import Optional
 
+import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 import torch.utils.checkpoint as checkpoint
@@ -46,7 +47,7 @@ _logger = logging.getLogger(__name__)
 def _cfg(url='', **kwargs):
     return {
         'url': url,
-        'num_classes': 1000, 'input_size': (3, 224, 224), 'pool_size': None,
+        'num_classes': 10, 'input_size': (3, WIDTH, HEIGHT), 'pool_size': None,
         'crop_pct': .9, 'interpolation': 'bicubic', 'fixed_input_size': True,
         'mean': IMAGENET_DEFAULT_MEAN, 'std': IMAGENET_DEFAULT_STD,
         'first_conv': 'patch_embed.proj', 'classifier': 'head',
@@ -171,9 +172,9 @@ class WindowAttention(nn.Module):
         relative_position_index = relative_coords.sum(-1)  # Wh*Ww, Wh*Ww
         self.register_buffer("relative_position_index", relative_position_index)
 
-        self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
+        self.qkv = nn.Linear(dim // factor, dim * 3 // factor, bias=qkv_bias)
         self.attn_drop = nn.Dropout(attn_drop)
-        self.proj = nn.Linear(dim, dim)
+        self.proj = nn.Linear(dim // factor, dim // factor)
         self.proj_drop = nn.Dropout(proj_drop)
 
         trunc_normal_(self.relative_position_bias_table, std=.02)
@@ -336,7 +337,7 @@ class PatchMerging(nn.Module):
         super().__init__()
         self.input_resolution = input_resolution
         self.dim = dim
-        self.reduction = nn.Linear(4 * dim, 2 * dim, bias=False)
+        self.reduction = nn.Linear(4 * dim // factor, 2 * dim // factor, bias=False)
         self.norm = norm_layer(4 * dim)
 
     def forward(self, x):
@@ -460,7 +461,7 @@ class SwinTransformer(pl.LightningModule):
         use_checkpoint (bool): Whether to use checkpointing to save memory. Default: False
     """
 
-    def __init__(self, img_size=224, patch_size=4, in_chans=3, num_classes=1000,
+    def __init__(self, img_size=224, patch_size=4, in_chans=8, num_classes=10,
                  embed_dim=96, depths=(2, 2, 6, 2), num_heads=(3, 6, 12, 24),
                  window_size=7, mlp_ratio=4., qkv_bias=True, qk_scale=None,
                  drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1,
@@ -500,7 +501,7 @@ class SwinTransformer(pl.LightningModule):
         for i_layer in range(self.num_layers):
             layers += [BasicLayer(
                 dim=int(embed_dim * 2 ** i_layer),
-                input_resolution=(self.patch_grid[0] // (2 ** i_layer), self.patch_grid[1] // (2 ** i_layer)),
+                input_resolution=(self.patch_grid[0], self.patch_grid[1]),
                 depth=depths[i_layer],
                 num_heads=num_heads[i_layer],
                 window_size=window_size,
@@ -513,7 +514,6 @@ class SwinTransformer(pl.LightningModule):
                 use_checkpoint=use_checkpoint)
             ]
         self.layers = nn.Sequential(*layers)
-
         self.norm = norm_layer(self.num_features)
         self.avgpool = nn.AdaptiveAvgPool1d(1)
         self.head = nn.Conv2d(self.num_features, num_classes, kernel_size=(3,3)) if num_classes > 0 else nn.Identity()
@@ -535,14 +535,15 @@ class SwinTransformer(pl.LightningModule):
         return {'relative_position_bias_table'}
 
     def forward_features(self, x):
+        print(self.patch_grid)
         x = self.patch_embed(x)
         if self.absolute_pos_embed is not None:
             x = x + self.absolute_pos_embed
         x = self.pos_drop(x)
         x = self.layers(x)
-        x = self.norm(x)  # B L C
+        x = self.norm(x)  # B L C 
         x = self.avgpool(x.transpose(1, 2))  # B C 1
-        x = torch.flatten(x, 1)
+        x = x.reshape(-1, self.num_classes)
         return x
     
     def forward(self, x):
