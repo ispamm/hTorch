@@ -11,6 +11,7 @@ import logging
 import math
 from copy import deepcopy
 from typing import Optional
+import numpy as np
 
 import pytorch_lightning as pl
 import torch
@@ -47,7 +48,7 @@ _logger = logging.getLogger(__name__)
 def _cfg(url='', **kwargs):
     return {
         'url': url,
-        'num_classes': 10, 'input_size': (3, WIDTH, HEIGHT), 'pool_size': None,
+        'num_classes': 10, 'input_size': (8, WIDTH, HEIGHT), 'pool_size': None,
         'crop_pct': .9, 'interpolation': 'bicubic', 'fixed_input_size': True,
         'mean': IMAGENET_DEFAULT_MEAN, 'std': IMAGENET_DEFAULT_STD,
         'first_conv': 'patch_embed.proj', 'classifier': 'head',
@@ -501,7 +502,7 @@ class SwinTransformer(pl.LightningModule):
         for i_layer in range(self.num_layers):
             layers += [BasicLayer(
                 dim=int(embed_dim * 2 ** i_layer),
-                input_resolution=(self.patch_grid[0], self.patch_grid[1]),
+                input_resolution=(self.patch_grid[0] // (2 ** i_layer), self.patch_grid[1] // (2 ** i_layer)),
                 depth=depths[i_layer],
                 num_heads=num_heads[i_layer],
                 window_size=window_size,
@@ -516,7 +517,14 @@ class SwinTransformer(pl.LightningModule):
         self.layers = nn.Sequential(*layers)
         self.norm = norm_layer(self.num_features)
         self.avgpool = nn.AdaptiveAvgPool1d(1)
-        self.head = nn.Conv2d(self.num_features, num_classes, kernel_size=(3,3)) if num_classes > 0 else nn.Identity()
+
+        self.upconv1 = nn.ConvTranspose2d(self.num_features, self.num_features // 2, 4, stride=2, padding=1)
+        self.upconv2 = nn.ConvTranspose2d(self.num_features//2, self.num_features // 4, 4, stride=2, padding=1)
+        self.upconv3 = nn.ConvTranspose2d(self.num_features//4, self.num_features // 8, 4, stride=2, padding=1)
+        self.upconv4 = nn.ConvTranspose2d(self.num_features//8, self.num_features // 16, 4, stride=2, padding=1)
+        self.upconv5 = nn.ConvTranspose2d(self.num_features//16, self.num_features // 32, 4, stride=2, padding=1)
+
+        self.head = nn.Conv2d(self.num_features // 32, num_classes, kernel_size=(3,3), padding=1) if num_classes > 0 else nn.Identity()
 
         assert weight_init in ('jax', 'jax_nlhb', 'nlhb', '')
         head_bias = -math.log(self.num_classes) if 'nlhb' in weight_init else 0.
@@ -535,15 +543,21 @@ class SwinTransformer(pl.LightningModule):
         return {'relative_position_bias_table'}
 
     def forward_features(self, x):
-        print(self.patch_grid)
+        input_shape = x.shape[-2:] 
         x = self.patch_embed(x)
         if self.absolute_pos_embed is not None:
             x = x + self.absolute_pos_embed
         x = self.pos_drop(x)
         x = self.layers(x)
         x = self.norm(x)  # B L C 
-        x = self.avgpool(x.transpose(1, 2))  # B C 1
-        x = x.reshape(-1, self.num_classes)
+        x = x.view(-1, x.size(2), int(x.size(1)**0.5), int(x.size(1)**0.5))
+      
+        x = self.upconv1(x)
+        x = self.upconv2(x)
+        x = self.upconv3(x)
+        x = self.upconv4(x)
+        x = self.upconv5(x)
+
         return x
     
     def forward(self, x):
