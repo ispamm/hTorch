@@ -29,14 +29,14 @@ def double_conv(in_channels, out_channels):
     )   
 
 
-class UNet(nn.Module):
+class UNet(pl.LightningModule):
 
     def __init__(self, quaternion=True, n_class=10):
         super().__init__()
 
         set_ops(quaternion)
 
-        self.dconv_down1 = double_conv(3, 64 // factor)
+        self.dconv_down1 = double_conv(8 // factor, 64 // factor)
         self.dconv_down2 = double_conv(64 // factor, 128 // factor)
         self.dconv_down3 = double_conv(128 // factor, 256 // factor)
         self.dconv_down4 = double_conv(256 // factor, 512 // factor)        
@@ -90,7 +90,7 @@ class UNet(nn.Module):
 
     def training_step(self, train_batch, batch_idx):
         inputs, labels = train_batch
-        outputs = self.forward(inputs, labels) 
+        outputs = self.forward(inputs) 
 
         probs = torch.sigmoid(outputs).data.cpu().numpy()
         crf = np.stack(list(map(dense_crf_wrapper, zip(inputs.cpu().numpy(), probs))))
@@ -107,7 +107,7 @@ class UNet(nn.Module):
 
     def validation_step(self, val_batch, batch_idx):
         inputs, labels = val_batch
-        outputs = self.forward(inputs, labels)
+        outputs = self.forward(inputs)
 
         probs = torch.sigmoid(outputs).data.cpu().numpy()
         crf = np.stack(list(map(dense_crf_wrapper, zip(inputs.cpu().numpy(), probs))))

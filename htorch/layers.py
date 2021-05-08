@@ -303,7 +303,7 @@ class QConvTranspose2d(nn.Module):
     """
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, output_padding=0, groups=1, dilation=1, spinor=False):
+                 padding=0, output_padding=0, groups=1, bias=True, dilation=1, spinor=False):
         """
         @type in_channels: int
         @type out_channels: int
@@ -325,6 +325,7 @@ class QConvTranspose2d(nn.Module):
         self.padding = padding
         self.output_padding = output_padding
         self.groups = groups
+        self.bias = bias
         self.dilation = dilation
         self.spinor = spinor
 

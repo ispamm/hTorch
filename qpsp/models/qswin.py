@@ -18,6 +18,10 @@ import torch
 import torch.nn as nn
 import torch.utils.checkpoint as checkpoint
 
+from htorch.layers import QLinear, QConvTranspose2d
+from htorch.functions import QModReLU
+
+
 from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from timm.models.helpers import build_model_with_cfg, overlay_external_default_cfg
 from timm.models.layers import PatchEmbed, Mlp, DropPath, to_2tuple, trunc_normal_
@@ -37,7 +41,8 @@ lin = nn.Linear
 factor = 1
 
 def set_ops(quaternion):
-    global lin, act, factor
+    global lin, conv_transp, act, factor
+    conv_transp = QConvTranspose2d if quaternion else nn.ConvTranspose2d
     lin = QLinear if quaternion else nn.Linear
     act = QModReLU if quaternion else nn.GELU
     factor = 4
@@ -173,9 +178,9 @@ class WindowAttention(nn.Module):
         relative_position_index = relative_coords.sum(-1)  # Wh*Ww, Wh*Ww
         self.register_buffer("relative_position_index", relative_position_index)
 
-        self.qkv = nn.Linear(dim // factor, dim * 3 // factor, bias=qkv_bias)
+        self.qkv = lin(dim // factor, dim * 3 // factor, bias=qkv_bias)
         self.attn_drop = nn.Dropout(attn_drop)
-        self.proj = nn.Linear(dim // factor, dim // factor)
+        self.proj = lin(dim // factor, dim // factor)
         self.proj_drop = nn.Dropout(proj_drop)
 
         trunc_normal_(self.relative_position_bias_table, std=.02)
@@ -338,7 +343,7 @@ class PatchMerging(nn.Module):
         super().__init__()
         self.input_resolution = input_resolution
         self.dim = dim
-        self.reduction = nn.Linear(4 * dim // factor, 2 * dim // factor, bias=False)
+        self.reduction = lin(4 * dim // factor, 2 * dim // factor, bias=False)
         self.norm = norm_layer(4 * dim)
 
     def forward(self, x):
@@ -467,9 +472,10 @@ class SwinTransformer(pl.LightningModule):
                  window_size=7, mlp_ratio=4., qkv_bias=True, qk_scale=None,
                  drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1,
                  norm_layer=nn.LayerNorm, ape=False, patch_norm=True,
-                 use_checkpoint=False, weight_init='', **kwargs):
+                 use_checkpoint=False, weight_init='', quaternion=True, **kwargs):
         super().__init__()
 
+        set_ops(quaternion)
         self.num_classes = num_classes
         self.num_layers = len(depths)
         self.embed_dim = embed_dim
@@ -518,13 +524,13 @@ class SwinTransformer(pl.LightningModule):
         self.norm = norm_layer(self.num_features)
         self.avgpool = nn.AdaptiveAvgPool1d(1)
 
-        self.upconv1 = nn.ConvTranspose2d(self.num_features, self.num_features // 2, 4, stride=2, padding=1)
-        self.upconv2 = nn.ConvTranspose2d(self.num_features//2, self.num_features // 4, 4, stride=2, padding=1)
-        self.upconv3 = nn.ConvTranspose2d(self.num_features//4, self.num_features // 8, 4, stride=2, padding=1)
-        self.upconv4 = nn.ConvTranspose2d(self.num_features//8, self.num_features // 16, 4, stride=2, padding=1)
-        self.upconv5 = nn.ConvTranspose2d(self.num_features//16, self.num_features // 32, 4, stride=2, padding=1)
+        self.upconv1 = conv_transp(self.num_features//factor, self.num_features//(2*factor), 4, stride=2, padding=1)
+        self.upconv2 = conv_transp(self.num_features//(2*factor), self.num_features//(4*factor), 4, stride=2, padding=1)
+        self.upconv3 = conv_transp(self.num_features//(4*factor), self.num_features//(8*factor), 4, stride=2, padding=1)
+        self.upconv4 = conv_transp(self.num_features//(8*factor), self.num_features//(16*factor), 4, stride=2, padding=1)
+        self.upconv5 = conv_transp(self.num_features//(16*factor), self.num_features//(32*factor), 4, stride=2, padding=1)
 
-        self.head = nn.Conv2d(self.num_features // 32, num_classes, kernel_size=(3,3), padding=1) if num_classes > 0 else nn.Identity()
+        self.head = nn.Conv2d(self.num_features//32, num_classes, kernel_size=(3,3), padding=1) if num_classes > 0 else nn.Identity()
 
         assert weight_init in ('jax', 'jax_nlhb', 'nlhb', '')
         head_bias = -math.log(self.num_classes) if 'nlhb' in weight_init else 0.
