@@ -52,10 +52,10 @@ class PSPNet(pl.LightningModule):
         assert zoom_factor in [1, 2, 4, 8]
         self.zoom_factor = zoom_factor
         self.use_ppm = use_ppm
-
-        self.act = act
         
         set_ops(quaternion)
+        self.act = act
+
         if layers == 50:
             resnet = resnet50(pretrained=pretrained, quaternion=quaternion)
         elif layers == 101:

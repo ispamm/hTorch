@@ -65,6 +65,10 @@ def t(self):
 def chunk(input, *args, **kwargs):
     return torch.chunk(input.q, *args, **kwargs)
 
+@implements(torch.Tensor.chunk)
+def chunk(input, *args, **kwargs):
+    return torch.chunk(input.q, chunks=4, *args, **kwargs)
+
 @implements(torch.Tensor.cpu)
 def cpu(self):
     return self.q.cpu()
@@ -194,6 +198,7 @@ def norm(self, *args, **kwargs):
     Quaternion (non-squared) norm.
     """
     return torch.sqrt(self.a**2 + self.b**2 + self.c**2 + self.d**2)
+
 
 @implements(torch.linalg.norm)
 def norm(input, *args, **kwargs):
@@ -464,6 +469,14 @@ def conv_transpose3d(input, *args, **kwargs):
 def bn(input, *args, **kwargs):
     return torch.nn.functional.batch_norm(input.q, *args, **kwargs)
 
+@implements(torch.nn.functional.dropout)
+def dropout(input, *args, **kwargs):
+    return torch.nn.functional.dropout(input.q, *args, **kwargs)
+
+@implements(torch.nn.Dropout)
+def dropout(input, *args, **kwargs):
+    return torch.nn.functional.dropout(input.q, *args, **kwargs)
+
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ---------------------------- QuaternionTensor ------------------------------------------
@@ -730,7 +743,7 @@ class QuaternionTensor(torch.Tensor):
         return new_obj 
             
     def chunk(self):
-        return self.a,self.b, self.c, self.d
+        return self.a, self.b, self.c, self.d
     
     def __add__(self, other):
         return torch.add(self, other)

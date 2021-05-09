@@ -68,7 +68,7 @@ default_cfgs = {
         input_size=(3, 384, 384), crop_pct=1.0),
 
     'swin_base_patch4_window7_224': _cfg(
-        url='https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_base_patch4_window7_224_22kto1k.pth',
+        url='https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_base_patch4_window7_224_22kto1k.pth', input_size=(3, 384, 384),
     ),
 
     'swin_large_patch4_window12_384': _cfg(
@@ -104,7 +104,7 @@ default_cfgs = {
         num_classes=21841),
 
 }
-
+import pdb
 
 def window_partition(x, window_size: int):
     """
@@ -178,9 +178,9 @@ class WindowAttention(nn.Module):
         relative_position_index = relative_coords.sum(-1)  # Wh*Ww, Wh*Ww
         self.register_buffer("relative_position_index", relative_position_index)
 
-        self.qkv = lin(dim // factor, dim * 3 // factor, bias=qkv_bias)
+        self.qkv = lin(dim, dim * 3, bias=qkv_bias)
         self.attn_drop = nn.Dropout(attn_drop)
-        self.proj = lin(dim // factor, dim // factor)
+        self.proj = lin(dim, dim)
         self.proj_drop = nn.Dropout(proj_drop)
 
         trunc_normal_(self.relative_position_bias_table, std=.02)
@@ -243,6 +243,7 @@ class SwinTransformerBlock(pl.LightningModule):
                  mlp_ratio=4., qkv_bias=True, qk_scale=None, drop=0., attn_drop=0., drop_path=0.,
                  act_layer=act, norm_layer=nn.LayerNorm):
         super().__init__()
+        self.act_layer = act
         self.dim = dim
         self.input_resolution = input_resolution
         self.num_heads = num_heads
@@ -263,7 +264,7 @@ class SwinTransformerBlock(pl.LightningModule):
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
         self.norm2 = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
-        self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
+        self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=self.act_layer, drop=drop)
 
         if self.shift_size > 0:
             # calculate attention mask for SW-MSA
@@ -467,15 +468,16 @@ class SwinTransformer(pl.LightningModule):
         use_checkpoint (bool): Whether to use checkpointing to save memory. Default: False
     """
 
-    def __init__(self, img_size=224, patch_size=4, in_chans=8, num_classes=10,
+    def __init__(self, img_size=384, patch_size=4, in_chans=8, num_classes=10,
                  embed_dim=96, depths=(2, 2, 6, 2), num_heads=(3, 6, 12, 24),
-                 window_size=7, mlp_ratio=4., qkv_bias=True, qk_scale=None,
+                 window_size=6, mlp_ratio=4., qkv_bias=True, qk_scale=None,
                  drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1,
                  norm_layer=nn.LayerNorm, ape=False, patch_norm=True,
                  use_checkpoint=False, weight_init='', quaternion=True, **kwargs):
         super().__init__()
 
         set_ops(quaternion)
+        import pdb
         self.num_classes = num_classes
         self.num_layers = len(depths)
         self.embed_dim = embed_dim
@@ -549,7 +551,8 @@ class SwinTransformer(pl.LightningModule):
         return {'relative_position_bias_table'}
 
     def forward_features(self, x):
-        input_shape = x.shape[-2:] 
+        
+        input_shape = x.shape[-2:]
         x = self.patch_embed(x)
         if self.absolute_pos_embed is not None:
             x = x + self.absolute_pos_embed
