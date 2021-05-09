@@ -24,12 +24,13 @@ class PPM(torch.nn.Module):
     def __init__(self, in_dim, reduction_dim, bins):
         super(PPM, self).__init__()
         self.features = []
+        self.act = act
         for bin in bins:
             self.features.append(nn.Sequential(
                 nn.AdaptiveAvgPool2d(bin),
                 conv(in_dim, reduction_dim, kernel_size=1, bias=False),
                 nn.BatchNorm2d(reduction_dim * 4),
-                act()
+                self.act()
             ))
         self.features = nn.ModuleList(self.features)
 
@@ -51,6 +52,8 @@ class PSPNet(pl.LightningModule):
         assert zoom_factor in [1, 2, 4, 8]
         self.zoom_factor = zoom_factor
         self.use_ppm = use_ppm
+
+        self.act = act
         
         set_ops(quaternion)
         if layers == 50:
@@ -82,7 +85,7 @@ class PSPNet(pl.LightningModule):
         self.cls = nn.Sequential(
             conv(fea_dim, 512 // factor, kernel_size=5, padding=1, bias=False),
             nn.BatchNorm2d(512),
-            act(),
+            self.act(),
             nn.Dropout2d(p=dropout),
             nn.Conv2d(512, classes, kernel_size=1)
         )
@@ -90,7 +93,7 @@ class PSPNet(pl.LightningModule):
             self.aux = nn.Sequential(
                 conv(1024 // factor, 256 // factor, kernel_size=3, padding=1, bias=False),
                 nn.BatchNorm2d(256),
-                act(),
+                self.act(),
                 nn.Dropout2d(p=dropout),
                 nn.Conv2d(256, classes, kernel_size=1)
             )
