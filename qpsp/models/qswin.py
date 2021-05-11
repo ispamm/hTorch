@@ -13,6 +13,8 @@ from copy import deepcopy
 from typing import Optional
 import numpy as np
 
+import pdb
+
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
@@ -292,6 +294,7 @@ class SwinTransformerBlock(pl.LightningModule):
         self.register_buffer("attn_mask", attn_mask)
 
     def forward(self, x):
+        print("blooooooooooooock", x.shape)
         H, W = self.input_resolution
         B, L, C = x.shape
         assert L == H * W, "input feature has wrong size"
@@ -344,13 +347,14 @@ class PatchMerging(nn.Module):
         super().__init__()
         self.input_resolution = input_resolution
         self.dim = dim
-        self.reduction = lin(4 * dim // factor, 2 * dim // factor, bias=False)
+        self.reduction = lin(4 * dim, 2 * dim // factor, bias=False)
         self.norm = norm_layer(4 * dim)
 
     def forward(self, x):
         """
         x: B, H*W, C
         """
+        print("inpuuuuuuuuuuuuuuuuuuuut", x.shape)
         H, W = self.input_resolution
         B, L, C = x.shape
         assert L == H * W, "input feature has wrong size"
@@ -363,8 +367,8 @@ class PatchMerging(nn.Module):
         x2 = x[:, 0::2, 1::2, :]  # B H/2 W/2 C
         x3 = x[:, 1::2, 1::2, :]  # B H/2 W/2 C
         x = torch.cat([x0, x1, x2, x3], -1)  # B H/2 W/2 4*C
-        x = x.view(B, -1, 4 * C)  # B H/2*W/2 4*C
-
+        x = x.view(B, -1, 4 * C).squeeze(0)  # B H/2*W/2 4*C
+        pdb.set_trace()
         x = self.norm(x)
         x = self.reduction(x)
 

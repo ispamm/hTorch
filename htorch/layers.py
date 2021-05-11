@@ -233,8 +233,10 @@ class QLinear(nn.Module):
             self.bias = None
 
     def forward(self, x):
+        print(x.shape)
         if x.dim() == 3:
-            x = torch.cat([*x.chunk()], 2).squeeze()
+            x = torch.cat([*torch.chunk(x, 4, 1)], 2).squeeze()
+            print(x.shape)
         return Q(F.linear(x, self.weight, self.bias))
 
 

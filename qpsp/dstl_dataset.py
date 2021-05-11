@@ -141,7 +141,7 @@ class LitDSTL(pl.LightningDataModule):
 
     def val_dataloader(self):
         val = DSTLDataset(file_names_val, transform=self.transform)
-        return torch.utils.data.DataLoader(val, batch_size=1, shuffle=SHUFFLE, pin_memory=True, num_workers=0)
+        return torch.utils.data.DataLoader(val, batch_size=BATCH_SIZE, shuffle=SHUFFLE, pin_memory=True, num_workers=0)
 
     def test_dataloader(self):
         test = DSTLDataset(file_names_test, transform=self.transform)
