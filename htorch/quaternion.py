@@ -477,6 +477,10 @@ def dropout(input, *args, **kwargs):
 def dropout(input, *args, **kwargs):
     return torch.nn.functional.dropout(input.q, *args, **kwargs)
 
+@implements(torch.nn.functional.layer_norm)
+def layer_norm(input, *args, **kwargs):
+    return torch.nn.functional.layer_norm(input.q, *args, **kwargs)
+    
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ---------------------------- QuaternionTensor ------------------------------------------
