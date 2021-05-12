@@ -30,11 +30,11 @@ from timm.models.layers import PatchEmbed, Mlp, DropPath, to_2tuple, trunc_norma
 from timm.models.registry import register_model
 from timm.models.vision_transformer import checkpoint_filter_fn, _init_vit_weights
 
-from ..madgrad import MADGRAD
-from ..loss import FocalTverskyLoss
-from ..utils import f1_score
-from ..constants import *
-from ..crf import dense_crf_wrapper
+from qpsp.madgrad import MADGRAD
+from qpsp.loss import FocalTverskyLoss
+from qpsp.utils import f1_score
+from qpsp.constants import *
+from qpsp.crf import dense_crf_wrapper
 
 _logger = logging.getLogger(__name__)
 
@@ -294,7 +294,6 @@ class SwinTransformerBlock(pl.LightningModule):
         self.register_buffer("attn_mask", attn_mask)
 
     def forward(self, x):
-        print("blooooooooooooock", x.shape)
         H, W = self.input_resolution
         B, L, C = x.shape
         assert L == H * W, "input feature has wrong size"
@@ -346,15 +345,14 @@ class PatchMerging(nn.Module):
     def __init__(self, input_resolution, dim, norm_layer=nn.LayerNorm):
         super().__init__()
         self.input_resolution = input_resolution
-        self.dim = dim
-        self.reduction = lin(4 * dim, 2 * dim // factor, bias=False)
-        self.norm = norm_layer(4 * dim)
+        self.dim = dim 
+        self.reduction = lin(dim, 2* dim // factor, bias=False)
+        self.norm = norm_layer(dim)
 
     def forward(self, x):
         """
         x: B, H*W, C
         """
-        print("inpuuuuuuuuuuuuuuuuuuuut", x.shape)
         H, W = self.input_resolution
         B, L, C = x.shape
         assert L == H * W, "input feature has wrong size"
@@ -367,11 +365,9 @@ class PatchMerging(nn.Module):
         x2 = x[:, 0::2, 1::2, :]  # B H/2 W/2 C
         x3 = x[:, 1::2, 1::2, :]  # B H/2 W/2 C
         x = torch.cat([x0, x1, x2, x3], -1)  # B H/2 W/2 4*C
-        x = x.view(B, -1, 4 * C).squeeze(0)  # B H/2*W/2 4*C
-        pdb.set_trace()
+        x = x.view(B, -1,  C).squeeze(0)  # B H/2*W/2 4*C
         x = self.norm(x)
         x = self.reduction(x)
-
         return x
 
     def extra_repr(self) -> str:
@@ -438,6 +434,7 @@ class BasicLayer(nn.Module):
                 x = checkpoint.checkpoint(blk, x)
             else:
                 x = blk(x)
+                
         if self.downsample is not None:
             x = self.downsample(x)
         return x
@@ -473,7 +470,7 @@ class SwinTransformer(pl.LightningModule):
     """
 
     def __init__(self, img_size=384, patch_size=4, in_chans=8, num_classes=10,
-                 embed_dim=96, depths=(2, 2, 6, 2), num_heads=(3, 6, 12, 24),
+                 embed_dim=96 // factor, depths=(2, 2, 6, 2), num_heads=(3, 6, 12, 24),
                  window_size=6, mlp_ratio=4., qkv_bias=True, qk_scale=None,
                  drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1,
                  norm_layer=nn.LayerNorm, ape=False, patch_norm=True,
@@ -481,7 +478,6 @@ class SwinTransformer(pl.LightningModule):
         super().__init__()
 
         set_ops(quaternion)
-        import pdb
         self.num_classes = num_classes
         self.num_layers = len(depths)
         self.embed_dim = embed_dim
@@ -530,7 +526,7 @@ class SwinTransformer(pl.LightningModule):
         self.norm = norm_layer(self.num_features)
         self.avgpool = nn.AdaptiveAvgPool1d(1)
 
-        self.upconv1 = conv_transp(self.num_features//factor, self.num_features//(2*factor), 4, stride=2, padding=1)
+        self.upconv1 = conv_transp(self.num_features//(factor), self.num_features//(2*factor), 4, stride=2, padding=1)
         self.upconv2 = conv_transp(self.num_features//(2*factor), self.num_features//(4*factor), 4, stride=2, padding=1)
         self.upconv3 = conv_transp(self.num_features//(4*factor), self.num_features//(8*factor), 4, stride=2, padding=1)
         self.upconv4 = conv_transp(self.num_features//(8*factor), self.num_features//(16*factor), 4, stride=2, padding=1)
