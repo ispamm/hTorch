@@ -235,5 +235,5 @@ class QModReLU(torch.nn.Module):
         self.bias = torch.nn.Parameter(torch.Tensor([bias]))
 
     def forward(self, x):
-        norm = x.norm()
+        norm = x.norm().to(x.device)
         return F.relu(norm + self.bias) * (x / norm) 

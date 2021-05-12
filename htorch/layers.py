@@ -234,7 +234,7 @@ class QLinear(nn.Module):
 
     def forward(self, x):
         if x.dim() == 3:
-            x = torch.cat([*x.chunk()], 2).squeeze()
+            x = torch.cat([*torch.chunk(x, 4, 1)], 2).squeeze()
         return Q(F.linear(x, self.weight, self.bias))
 
 
@@ -291,7 +291,7 @@ class QConvTranspose1d(nn.Module):
     def forward(self, x):
         if x.dim() == 5:
             x = torch.cat([*x.chunk()], 2).squeeze()
-        return Q(F.conv_transpose1d(x, self.weight, self.bias, self.stride,
+        return Q(F.conv_transpose1d(x, self.weight.transpose(0,1), self.bias, self.stride,
                                   self.padding, self.output_padding, self.groups, self.dilation))
 
 
@@ -303,7 +303,7 @@ class QConvTranspose2d(nn.Module):
     """
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, output_padding=0, groups=1, dilation=1, spinor=False):
+                 padding=0, output_padding=0, groups=1, bias=True, dilation=1, spinor=False):
         """
         @type in_channels: int
         @type out_channels: int
@@ -325,6 +325,7 @@ class QConvTranspose2d(nn.Module):
         self.padding = padding
         self.output_padding = output_padding
         self.groups = groups
+        self.bias = bias
         self.dilation = dilation
         self.spinor = spinor
 
@@ -349,7 +350,7 @@ class QConvTranspose2d(nn.Module):
     def forward(self, x):
         if x.dim() == 5:
             x = torch.cat([*x.chunk()], 2).squeeze()
-        return Q(F.conv_transpose2d(x, self.weight, self.bias, self.stride,
+        return Q(F.conv_transpose2d(x, self.weight.transpose(0,1), self.bias, self.stride,
                                   self.padding, self.output_padding, self.groups, self.dilation))
 
 
@@ -405,7 +406,7 @@ class QConvTranspose3d(nn.Module):
     def forward(self, x):
         if x.dim() == 5:
             x = torch.cat([*x.chunk()], 2).squeeze()
-        return Q(F.conv_transpose3d(x, self.weight, self.bias, self.stride,
+        return Q(F.conv_transpose3d(x, self.weight.transpose(0,1), self.bias, self.stride,
                                   self.padding, self.output_padding, self.groups, self.dilation))
 
 # reference https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=8632910

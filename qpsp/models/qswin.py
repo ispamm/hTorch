@@ -11,37 +11,51 @@ import logging
 import math
 from copy import deepcopy
 from typing import Optional
+import numpy as np
 
+import pdb
+
+import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 import torch.utils.checkpoint as checkpoint
 
+from htorch.layers import QLinear, QConvTranspose2d
+from htorch.functions import QModReLU
+
+
 from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from timm.models.helpers import build_model_with_cfg, overlay_external_default_cfg
-from timm.models.layers import DropPath, to_2tuple, trunc_normal_
+from timm.models.layers import PatchEmbed, Mlp, DropPath, to_2tuple, trunc_normal_
 from timm.models.registry import register_model
-from timm.models.vision_transformer import checkpoint_filter_fn, Mlp, PatchEmbed, _init_vit_weights
+from timm.models.vision_transformer import checkpoint_filter_fn, _init_vit_weights
 
-from ..madgrad import MADGRAD
-from ..loss import FocalTverskyLoss
-from ..utils import f1_score
-from ..constants import *
-from ..crf import dense_crf_wrapper
+from qpsp.madgrad import MADGRAD
+from qpsp.loss import FocalTverskyLoss
+from qpsp.utils import f1_score
+from qpsp.constants import *
+from qpsp.crf import dense_crf_wrapper
 
 _logger = logging.getLogger(__name__)
 
+act = nn.GELU
+lin = nn.Linear
+factor = 1
 
-def set_ops(quaternion)
-    global lin, act, factor
+def set_ops(quaternion):
+    global lin, conv_transp, act, factor
+    conv_transp = QConvTranspose2d if quaternion else nn.ConvTranspose2d
     lin = QLinear if quaternion else nn.Linear
     act = QModReLU if quaternion else nn.GELU
     factor = 4
 
 
+_logger = logging.getLogger(__name__)
+
 def _cfg(url='', **kwargs):
     return {
         'url': url,
-        'num_classes': 1000, 'input_size': (3, 224, 224), 'pool_size': None,
+        'num_classes': 10, 'input_size': (8, WIDTH, HEIGHT), 'pool_size': None,
         'crop_pct': .9, 'interpolation': 'bicubic', 'fixed_input_size': True,
         'mean': IMAGENET_DEFAULT_MEAN, 'std': IMAGENET_DEFAULT_STD,
         'first_conv': 'patch_embed.proj', 'classifier': 'head',
@@ -56,7 +70,7 @@ default_cfgs = {
         input_size=(3, 384, 384), crop_pct=1.0),
 
     'swin_base_patch4_window7_224': _cfg(
-        url='https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_base_patch4_window7_224_22kto1k.pth',
+        url='https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_base_patch4_window7_224_22kto1k.pth', input_size=(3, 384, 384),
     ),
 
     'swin_large_patch4_window12_384': _cfg(
@@ -92,13 +106,14 @@ default_cfgs = {
         num_classes=21841),
 
 }
-
+import pdb
 
 def window_partition(x, window_size: int):
     """
     Args:
         x: (B, H, W, C)
         window_size (int): window size
+
     Returns:
         windows: (num_windows*B, window_size, window_size, C)
     """
@@ -115,6 +130,7 @@ def window_reverse(windows, window_size: int, H: int, W: int):
         window_size (int): Window size
         H (int): Height of image
         W (int): Width of image
+
     Returns:
         x: (B, H, W, C)
     """
@@ -127,6 +143,7 @@ def window_reverse(windows, window_size: int, H: int, W: int):
 class WindowAttention(nn.Module):
     r""" Window based multi-head self attention (W-MSA) module with relative position bias.
     It supports both of shifted and non-shifted window.
+
     Args:
         dim (int): Number of input channels.
         window_size (tuple[int]): The height and width of the window.
@@ -205,8 +222,9 @@ class WindowAttention(nn.Module):
         return x
 
 
-class SwinTransformerBlock(nn.Module):
+class SwinTransformerBlock(pl.LightningModule):
     r""" Swin Transformer Block.
+
     Args:
         dim (int): Number of input channels.
         input_resolution (tuple[int]): Input resulotion.
@@ -227,6 +245,7 @@ class SwinTransformerBlock(nn.Module):
                  mlp_ratio=4., qkv_bias=True, qk_scale=None, drop=0., attn_drop=0., drop_path=0.,
                  act_layer=act, norm_layer=nn.LayerNorm):
         super().__init__()
+        self.act_layer = act
         self.dim = dim
         self.input_resolution = input_resolution
         self.num_heads = num_heads
@@ -247,7 +266,7 @@ class SwinTransformerBlock(nn.Module):
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
         self.norm2 = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
-        self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
+        self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=self.act_layer, drop=drop)
 
         if self.shift_size > 0:
             # calculate attention mask for SW-MSA
@@ -316,6 +335,7 @@ class SwinTransformerBlock(nn.Module):
 
 class PatchMerging(nn.Module):
     r""" Patch Merging Layer.
+
     Args:
         input_resolution (tuple[int]): Resolution of input feature.
         dim (int): Number of input channels.
@@ -325,9 +345,9 @@ class PatchMerging(nn.Module):
     def __init__(self, input_resolution, dim, norm_layer=nn.LayerNorm):
         super().__init__()
         self.input_resolution = input_resolution
-        self.dim = dim
-        self.reduction = lin(4 * dim, 2 * dim, bias=False)
-        self.norm = norm_layer(4 * dim)
+        self.dim = dim 
+        self.reduction = lin(dim, 2* dim // factor, bias=False)
+        self.norm = norm_layer(dim)
 
     def forward(self, x):
         """
@@ -345,11 +365,9 @@ class PatchMerging(nn.Module):
         x2 = x[:, 0::2, 1::2, :]  # B H/2 W/2 C
         x3 = x[:, 1::2, 1::2, :]  # B H/2 W/2 C
         x = torch.cat([x0, x1, x2, x3], -1)  # B H/2 W/2 4*C
-        x = x.view(B, -1, 4 * C)  # B H/2*W/2 4*C
-
+        x = x.view(B, -1,  C).squeeze(0)  # B H/2*W/2 4*C
         x = self.norm(x)
         x = self.reduction(x)
-
         return x
 
     def extra_repr(self) -> str:
@@ -364,6 +382,7 @@ class PatchMerging(nn.Module):
 
 class BasicLayer(nn.Module):
     """ A basic Swin Transformer layer for one stage.
+
     Args:
         dim (int): Number of input channels.
         input_resolution (tuple[int]): Input resolution.
@@ -415,6 +434,7 @@ class BasicLayer(nn.Module):
                 x = checkpoint.checkpoint(blk, x)
             else:
                 x = blk(x)
+                
         if self.downsample is not None:
             x = self.downsample(x)
         return x
@@ -427,6 +447,7 @@ class SwinTransformer(pl.LightningModule):
     r""" Swin Transformer
         A PyTorch impl of : `Swin Transformer: Hierarchical Vision Transformer using Shifted Windows`  -
           https://arxiv.org/pdf/2103.14030
+
     Args:
         img_size (int | tuple(int)): Input image size. Default 224
         patch_size (int | tuple(int)): Patch size. Default: 4
@@ -448,14 +469,15 @@ class SwinTransformer(pl.LightningModule):
         use_checkpoint (bool): Whether to use checkpointing to save memory. Default: False
     """
 
-    def __init__(self, img_size=224, patch_size=4, in_chans=3, num_classes=1000,
-                 embed_dim=96, depths=(2, 2, 6, 2), num_heads=(3, 6, 12, 24),
-                 window_size=7, mlp_ratio=4., qkv_bias=True, qk_scale=None,
+    def __init__(self, img_size=384, patch_size=4, in_chans=8, num_classes=10,
+                 embed_dim=96 // factor, depths=(2, 2, 6, 2), num_heads=(3, 6, 12, 24),
+                 window_size=6, mlp_ratio=4., qkv_bias=True, qk_scale=None,
                  drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1,
                  norm_layer=nn.LayerNorm, ape=False, patch_norm=True,
-                 use_checkpoint=False, weight_init='', **kwargs):
+                 use_checkpoint=False, weight_init='', quaternion=True, **kwargs):
         super().__init__()
 
+        set_ops(quaternion)
         self.num_classes = num_classes
         self.num_layers = len(depths)
         self.embed_dim = embed_dim
@@ -469,7 +491,7 @@ class SwinTransformer(pl.LightningModule):
             img_size=img_size, patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim,
             norm_layer=norm_layer if self.patch_norm else None)
         num_patches = self.patch_embed.num_patches
-        self.patch_grid = self.patch_embed.patch_grid
+        self.patch_grid = self.patch_embed.grid_size
 
         # absolute position embedding
         if self.ape:
@@ -501,10 +523,16 @@ class SwinTransformer(pl.LightningModule):
                 use_checkpoint=use_checkpoint)
             ]
         self.layers = nn.Sequential(*layers)
-
         self.norm = norm_layer(self.num_features)
         self.avgpool = nn.AdaptiveAvgPool1d(1)
-        self.head = conv(self.num_features, num_classes) if num_classes > 0 else nn.Identity()
+
+        self.upconv1 = conv_transp(self.num_features//(factor), self.num_features//(2*factor), 4, stride=2, padding=1)
+        self.upconv2 = conv_transp(self.num_features//(2*factor), self.num_features//(4*factor), 4, stride=2, padding=1)
+        self.upconv3 = conv_transp(self.num_features//(4*factor), self.num_features//(8*factor), 4, stride=2, padding=1)
+        self.upconv4 = conv_transp(self.num_features//(8*factor), self.num_features//(16*factor), 4, stride=2, padding=1)
+        self.upconv5 = conv_transp(self.num_features//(16*factor), self.num_features//(32*factor), 4, stride=2, padding=1)
+
+        self.head = nn.Conv2d(self.num_features//32, num_classes, kernel_size=(3,3), padding=1) if num_classes > 0 else nn.Identity()
 
         assert weight_init in ('jax', 'jax_nlhb', 'nlhb', '')
         head_bias = -math.log(self.num_classes) if 'nlhb' in weight_init else 0.
@@ -523,21 +551,29 @@ class SwinTransformer(pl.LightningModule):
         return {'relative_position_bias_table'}
 
     def forward_features(self, x):
+        
+        input_shape = x.shape[-2:]
         x = self.patch_embed(x)
         if self.absolute_pos_embed is not None:
             x = x + self.absolute_pos_embed
         x = self.pos_drop(x)
         x = self.layers(x)
-        x = self.norm(x)  # B L C
-        x = self.avgpool(x.transpose(1, 2))  # B C 1
-        x = torch.flatten(x, 1)
-        return x
+        x = self.norm(x)  # B L C 
+        x = x.view(-1, x.size(2), int(x.size(1)**0.5), int(x.size(1)**0.5))
+      
+        x = self.upconv1(x)
+        x = self.upconv2(x)
+        x = self.upconv3(x)
+        x = self.upconv4(x)
+        x = self.upconv5(x)
 
+        return x
+    
     def forward(self, x):
         x = self.forward_features(x)
         x = self.head(x)
         return x
-    
+
     def configure_optimizers(self):
         optimizer = MADGRAD(self.parameters(), lr=LEARNING_RATE)
         return optimizer
@@ -548,7 +584,7 @@ class SwinTransformer(pl.LightningModule):
 
     def training_step(self, train_batch, batch_idx):
         inputs, labels = train_batch
-        outputs = self.forward(inputs, labels) 
+        outputs = self.forward(inputs) 
 
         probs = torch.sigmoid(outputs).data.cpu().numpy()
         crf = np.stack(list(map(dense_crf_wrapper, zip(inputs.cpu().numpy(), probs))))
@@ -565,7 +601,7 @@ class SwinTransformer(pl.LightningModule):
 
     def validation_step(self, val_batch, batch_idx):
         inputs, labels = val_batch
-        outputs = self.forward(inputs, labels)
+        outputs = self.forward(inputs)
 
         probs = torch.sigmoid(outputs).data.cpu().numpy()
         crf = np.stack(list(map(dense_crf_wrapper, zip(inputs.cpu().numpy(), probs))))
@@ -601,7 +637,6 @@ def _create_swin_transformer(variant, pretrained=False, default_cfg=None, **kwar
         **kwargs)
 
     return model
-
 
 
 

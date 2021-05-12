@@ -6,14 +6,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-from .madgrad import MADGRAD
+from ..madgrad import MADGRAD
 from .qresnet import resnet50, resnet101, resnet152
-from .loss import FocalTverskyLoss
-from .utils import f1_score
-from .constants import *
-from .crf import dense_crf_wrapper
+from ..loss import FocalTverskyLoss
+from ..utils import f1_score
+from ..constants import *
+from ..crf import dense_crf_wrapper
 
-def set_ops(quaternion)
+def set_ops(quaternion):
     global conv, act, factor
     conv = QConv2d if quaternion else nn.Conv2d
     act = QModReLU if quaternion else nn.ReLU
@@ -24,12 +24,13 @@ class PPM(torch.nn.Module):
     def __init__(self, in_dim, reduction_dim, bins):
         super(PPM, self).__init__()
         self.features = []
+        self.act = act
         for bin in bins:
             self.features.append(nn.Sequential(
                 nn.AdaptiveAvgPool2d(bin),
                 conv(in_dim, reduction_dim, kernel_size=1, bias=False),
                 nn.BatchNorm2d(reduction_dim * 4),
-                act()
+                self.act()
             ))
         self.features = nn.ModuleList(self.features)
 
@@ -53,6 +54,8 @@ class PSPNet(pl.LightningModule):
         self.use_ppm = use_ppm
         
         set_ops(quaternion)
+        self.act = act
+
         if layers == 50:
             resnet = resnet50(pretrained=pretrained, quaternion=quaternion)
         elif layers == 101:
@@ -82,7 +85,7 @@ class PSPNet(pl.LightningModule):
         self.cls = nn.Sequential(
             conv(fea_dim, 512 // factor, kernel_size=5, padding=1, bias=False),
             nn.BatchNorm2d(512),
-            act(),
+            self.act(),
             nn.Dropout2d(p=dropout),
             nn.Conv2d(512, classes, kernel_size=1)
         )
@@ -90,7 +93,7 @@ class PSPNet(pl.LightningModule):
             self.aux = nn.Sequential(
                 conv(1024 // factor, 256 // factor, kernel_size=3, padding=1, bias=False),
                 nn.BatchNorm2d(256),
-                act(),
+                self.act(),
                 nn.Dropout2d(p=dropout),
                 nn.Conv2d(256, classes, kernel_size=1)
             )
