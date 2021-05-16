@@ -94,11 +94,11 @@ def allclose(input1, input2, *args, **kwargs):
 
 @implements(torch.cat)
 def cat(input, *args, **kwargs):
-    return torch.cat(input, *args, **kwargs)
+    return torch.cat([x.q for x in input], *args, **kwargs)
 
 @implements(torch.stack)
 def stack(input, *args, **kwargs):
-    return torch.cat(input, *args, **kwargs)
+    return torch.cat([x.q for x in input], *args, **kwargs)
 
 @implements(torch.Tensor.neg)
 def neg(input):
@@ -480,7 +480,11 @@ def dropout(input, *args, **kwargs):
 @implements(torch.nn.functional.layer_norm)
 def layer_norm(input, *args, **kwargs):
     return torch.nn.functional.layer_norm(input.q, *args, **kwargs)
-    
+
+@implements(torch.nn.functional.interpolate)
+def interpolate(input, *args, **kwargs):
+    return torch.nn.functional.interpolate(input.q, *args, **kwargs)
+
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ---------------------------- QuaternionTensor ------------------------------------------
