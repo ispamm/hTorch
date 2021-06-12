@@ -13,6 +13,11 @@ from .utils import f1_score
 from .constants import *
 from .crf import dense_crf_wrapper
 
+def set_ops(quaternion)
+    global conv, act, factor
+    conv = QConv2d if quaternion else nn.Conv2d
+    act = QModReLU if quaternion else nn.ReLU
+    factor = 4
 
 
 class PPM(torch.nn.Module):
@@ -22,9 +27,9 @@ class PPM(torch.nn.Module):
         for bin in bins:
             self.features.append(nn.Sequential(
                 nn.AdaptiveAvgPool2d(bin),
-                QConv2d(in_dim, reduction_dim, kernel_size=1, bias=False),
+                conv(in_dim, reduction_dim, kernel_size=1, bias=False),
                 nn.BatchNorm2d(reduction_dim * 4),
-                QModReLU()
+                act()
             ))
         self.features = nn.ModuleList(self.features)
 
@@ -37,7 +42,7 @@ class PPM(torch.nn.Module):
 
 
 class PSPNet(pl.LightningModule):
-    def __init__(self, layers=50, bins=(1, 2, 3, 6), dropout=0.1, classes=10, zoom_factor=8, use_ppm=True,
+    def __init__(self, quaternion=True, layers=50, bins=(1, 2, 3, 6), dropout=0.1, classes=10, zoom_factor=8, use_ppm=True,
                  pretrained=False, training=True):
         super(PSPNet, self).__init__()
         assert layers in [50, 101, 152]
@@ -46,13 +51,15 @@ class PSPNet(pl.LightningModule):
         assert zoom_factor in [1, 2, 4, 8]
         self.zoom_factor = zoom_factor
         self.use_ppm = use_ppm
-
+        
+        set_ops(quaternion)
         if layers == 50:
-            resnet = resnet50(pretrained=pretrained)
+            resnet = resnet50(pretrained=pretrained, quaternion=quaternion)
         elif layers == 101:
-            resnet = resnet101(pretrained=pretrained)
+            resnet = resnet101(pretrained=pretrained, quaternion=quaternion)
         else:
-            resnet = resnet152(pretrained=pretrained)
+            resnet = resnet152(pretrained=pretrained, quaternion=quaternion)
+
         self.layer0 = nn.Sequential(resnet.conv1, resnet.bn1, resnet.conv2, resnet.bn2, resnet.conv3, resnet.bn3,
                                     resnet.maxpool)
         self.layer1, self.layer2, self.layer3, self.layer4 = resnet.layer1, resnet.layer2, resnet.layer3, resnet.layer4
@@ -68,22 +75,22 @@ class PSPNet(pl.LightningModule):
             elif 'downsample.0' in n:
                 m.stride = (1, 1)
 
-        fea_dim = 2048 // 4
+        fea_dim = 2048 // factor
         if use_ppm:
             self.ppm = PPM(fea_dim, int(fea_dim / len(bins)), bins)
             fea_dim *= 2
         self.cls = nn.Sequential(
-            QConv2d(fea_dim, 512 // 4, kernel_size=5, padding=1, bias=False),
+            conv(fea_dim, 512 // factor, kernel_size=5, padding=1, bias=False),
             nn.BatchNorm2d(512),
-            QModReLU(),
+            act(),
             nn.Dropout2d(p=dropout),
             nn.Conv2d(512, classes, kernel_size=1)
         )
         if self.training:
             self.aux = nn.Sequential(
-                QConv2d(1024 // 4, 256 // 4, kernel_size=3, padding=1, bias=False),
+                conv(1024 // factor, 256 // factor, kernel_size=3, padding=1, bias=False),
                 nn.BatchNorm2d(256),
-                QModReLU(),
+                act(),
                 nn.Dropout2d(p=dropout),
                 nn.Conv2d(256, classes, kernel_size=1)
             )
