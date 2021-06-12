@@ -1,4 +1,3 @@
-
 """
 credit: https://github.com/usuyama/pytorch-unet/blob/master/pytorch_unet.py
 """
@@ -8,17 +7,12 @@ from htorch.layers import QConv2d
 from htorch.functions import QModReLU
 import torch
 import torch.nn as nn
-import numpy as np
 
 from ..madgrad import MADGRAD
 from ..loss import FocalTverskyLoss
 from ..utils import f1_score
 from ..constants import *
 from ..crf import dense_crf_wrapper
-
-from htorch.quaternion import QuaternionTensor
-
-Q = QuaternionTensor
 
 def set_ops(quaternion):
     global conv, act, factor
@@ -70,15 +64,15 @@ class UNet(pl.LightningModule):
         x = self.dconv_down4(x)
         
         x = self.upsample(x)        
-        x = torch.cat([Q(x), conv3], dim=1)
+        x = torch.cat([x, conv3], dim=1)
         
         x = self.dconv_up3(x)
         x = self.upsample(x)        
-        x = torch.cat([Q(x), conv2], dim=1)       
+        x = torch.cat([x, conv2], dim=1)       
 
         x = self.dconv_up2(x)
         x = self.upsample(x)        
-        x = torch.cat([Q(x), conv1], dim=1)   
+        x = torch.cat([x, conv1], dim=1)   
         
         x = self.dconv_up1(x)
         
