@@ -12,7 +12,7 @@ def set_ops(quaternion)
     global conv, act, factor
     conv = QConv2d if quaternion else nn.Conv2d
     act = QModReLU if quaternion else nn.ReLU
-    factor = 4
+    factor = 4 else 1
 
 def double_conv(in_channels, out_channels):
     return nn.Sequential(
