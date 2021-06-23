@@ -30,7 +30,7 @@ def set_ops(quaternion)
     global lin, act, factor
     lin = QLinear if quaternion else nn.Linear
     act = QModReLU if quaternion else nn.GELU
-    factor = 4
+    factor = 4 if quaternion else 1
 
 
 def _cfg(url='', **kwargs):
