@@ -10,7 +10,7 @@ def set_ops(quaternion)
     global conv, act, factor
     conv = QConv2d if quaternion else nn.Conv2d
     act = QModReLU if quaternion else nn.ReLU
-    factor = 4
+    factor = 4 if quaternion else 1
 
 
 def conv3x3(in_planes, out_planes, stride=1):
