@@ -7,6 +7,7 @@ credits: https://github.com/rwightman/pytorch-image-models/blob/master/timm/mode
 # Licensed under The MIT License [see LICENSE for details]
 # Written by Ze Liu
 # --------------------------------------------------------
+
 import logging
 import math
 from copy import deepcopy
@@ -16,6 +17,7 @@ import numpy as np
 import pdb
 
 import pytorch_lightning as pl
+
 import torch
 import torch.nn as nn
 import torch.utils.checkpoint as checkpoint
@@ -47,7 +49,7 @@ def set_ops(quaternion):
     conv_transp = QConvTranspose2d if quaternion else nn.ConvTranspose2d
     lin = QLinear if quaternion else nn.Linear
     act = QModReLU if quaternion else nn.GELU
-    factor = 4
+    factor = 4 if quaternion else 1
 
 
 _logger = logging.getLogger(__name__)
@@ -56,6 +58,7 @@ def _cfg(url='', **kwargs):
     return {
         'url': url,
         'num_classes': 10, 'input_size': (8, WIDTH, HEIGHT), 'pool_size': None,
+
         'crop_pct': .9, 'interpolation': 'bicubic', 'fixed_input_size': True,
         'mean': IMAGENET_DEFAULT_MEAN, 'std': IMAGENET_DEFAULT_STD,
         'first_conv': 'patch_embed.proj', 'classifier': 'head',
@@ -71,6 +74,7 @@ default_cfgs = {
 
     'swin_base_patch4_window7_224': _cfg(
         url='https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_base_patch4_window7_224_22kto1k.pth', input_size=(3, 384, 384),
+
     ),
 
     'swin_large_patch4_window12_384': _cfg(
@@ -108,12 +112,12 @@ default_cfgs = {
 }
 import pdb
 
+
 def window_partition(x, window_size: int):
     """
     Args:
         x: (B, H, W, C)
         window_size (int): window size
-
     Returns:
         windows: (num_windows*B, window_size, window_size, C)
     """
@@ -130,7 +134,6 @@ def window_reverse(windows, window_size: int, H: int, W: int):
         window_size (int): Window size
         H (int): Height of image
         W (int): Width of image
-
     Returns:
         x: (B, H, W, C)
     """
@@ -143,7 +146,6 @@ def window_reverse(windows, window_size: int, H: int, W: int):
 class WindowAttention(nn.Module):
     r""" Window based multi-head self attention (W-MSA) module with relative position bias.
     It supports both of shifted and non-shifted window.
-
     Args:
         dim (int): Number of input channels.
         window_size (tuple[int]): The height and width of the window.
@@ -224,7 +226,6 @@ class WindowAttention(nn.Module):
 
 class SwinTransformerBlock(pl.LightningModule):
     r""" Swin Transformer Block.
-
     Args:
         dim (int): Number of input channels.
         input_resolution (tuple[int]): Input resulotion.
@@ -246,6 +247,7 @@ class SwinTransformerBlock(pl.LightningModule):
                  act_layer=act, norm_layer=nn.LayerNorm):
         super().__init__()
         self.act_layer = act
+
         self.dim = dim
         self.input_resolution = input_resolution
         self.num_heads = num_heads
@@ -267,7 +269,6 @@ class SwinTransformerBlock(pl.LightningModule):
         self.norm2 = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
         self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=self.act_layer, drop=drop)
-
         if self.shift_size > 0:
             # calculate attention mask for SW-MSA
             H, W = self.input_resolution
@@ -335,7 +336,6 @@ class SwinTransformerBlock(pl.LightningModule):
 
 class PatchMerging(nn.Module):
     r""" Patch Merging Layer.
-
     Args:
         input_resolution (tuple[int]): Resolution of input feature.
         dim (int): Number of input channels.
@@ -382,7 +382,6 @@ class PatchMerging(nn.Module):
 
 class BasicLayer(nn.Module):
     """ A basic Swin Transformer layer for one stage.
-
     Args:
         dim (int): Number of input channels.
         input_resolution (tuple[int]): Input resolution.
@@ -434,7 +433,6 @@ class BasicLayer(nn.Module):
                 x = checkpoint.checkpoint(blk, x)
             else:
                 x = blk(x)
-                
         if self.downsample is not None:
             x = self.downsample(x)
         return x
@@ -447,6 +445,7 @@ class SwinTransformer(pl.LightningModule):
     r""" Swin Transformer
         A PyTorch impl of : `Swin Transformer: Hierarchical Vision Transformer using Shifted Windows`  -
           https://arxiv.org/pdf/2103.14030
+
 
     Args:
         img_size (int | tuple(int)): Input image size. Default 224
@@ -478,6 +477,7 @@ class SwinTransformer(pl.LightningModule):
         super().__init__()
 
         set_ops(quaternion)
+
         self.num_classes = num_classes
         self.num_layers = len(depths)
         self.embed_dim = embed_dim
@@ -492,6 +492,7 @@ class SwinTransformer(pl.LightningModule):
             norm_layer=norm_layer if self.patch_norm else None)
         num_patches = self.patch_embed.num_patches
         self.patch_grid = self.patch_embed.grid_size
+
 
         # absolute position embedding
         if self.ape:
@@ -534,6 +535,7 @@ class SwinTransformer(pl.LightningModule):
 
         self.head = nn.Conv2d(self.num_features//32, num_classes, kernel_size=(3,3), padding=1) if num_classes > 0 else nn.Identity()
 
+
         assert weight_init in ('jax', 'jax_nlhb', 'nlhb', '')
         head_bias = -math.log(self.num_classes) if 'nlhb' in weight_init else 0.
         if weight_init.startswith('jax'):
@@ -553,6 +555,7 @@ class SwinTransformer(pl.LightningModule):
     def forward_features(self, x):
         
         input_shape = x.shape[-2:]
+
         x = self.patch_embed(x)
         if self.absolute_pos_embed is not None:
             x = x + self.absolute_pos_embed
@@ -569,6 +572,7 @@ class SwinTransformer(pl.LightningModule):
 
         return x
     
+
     def forward(self, x):
         x = self.forward_features(x)
         x = self.head(x)
@@ -614,6 +618,7 @@ class SwinTransformer(pl.LightningModule):
         self.log('val_loss', loss)
         self.log('val_f1_crf', f1_crf)
         self.log('val_f1', f1)
+
 
 
 def _create_swin_transformer(variant, pretrained=False, default_cfg=None, **kwargs):

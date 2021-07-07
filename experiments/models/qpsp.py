@@ -17,7 +17,8 @@ def set_ops(quaternion):
     global conv, act, factor
     conv = QConv2d if quaternion else nn.Conv2d
     act = QModReLU if quaternion else nn.ReLU
-    factor = 4
+    factor = 4 if quaternion else 1
+
 
 
 class PPM(torch.nn.Module):
@@ -25,12 +26,14 @@ class PPM(torch.nn.Module):
         super(PPM, self).__init__()
         self.features = []
         self.act = act
+
         for bin in bins:
             self.features.append(nn.Sequential(
                 nn.AdaptiveAvgPool2d(bin),
                 conv(in_dim, reduction_dim, kernel_size=1, bias=False),
                 nn.BatchNorm2d(reduction_dim * 4),
                 self.act()
+
             ))
         self.features = nn.ModuleList(self.features)
 
@@ -55,6 +58,7 @@ class PSPNet(pl.LightningModule):
         
         set_ops(quaternion)
         self.act = act
+
 
         if layers == 50:
             resnet = resnet50(pretrained=pretrained, quaternion=quaternion)
@@ -86,6 +90,7 @@ class PSPNet(pl.LightningModule):
             conv(fea_dim, 512 // factor, kernel_size=5, padding=1, bias=False),
             nn.BatchNorm2d(512),
             self.act(),
+
             nn.Dropout2d(p=dropout),
             nn.Conv2d(512, classes, kernel_size=1)
         )
@@ -94,6 +99,7 @@ class PSPNet(pl.LightningModule):
                 conv(1024 // factor, 256 // factor, kernel_size=3, padding=1, bias=False),
                 nn.BatchNorm2d(256),
                 self.act(),
+
                 nn.Dropout2d(p=dropout),
                 nn.Conv2d(256, classes, kernel_size=1)
             )
@@ -167,3 +173,4 @@ class PSPNet(pl.LightningModule):
         self.log('val_loss', loss)
         self.log('val_f1_crf', f1_crf)
         self.log('val_f1', f1)
+

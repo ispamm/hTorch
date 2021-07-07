@@ -10,7 +10,8 @@ def set_ops(quaternion):
     global conv, act, factor
     conv = QConv2d if quaternion else nn.Conv2d
     act = QModReLU if quaternion else nn.ReLU
-    factor = 4
+    factor = 4 if quaternion else 1
+
 
 
 def conv3x3(in_planes, out_planes, stride=1):
@@ -54,6 +55,7 @@ class BasicBlock(nn.Module):
     def __init__(self, inplanes, planes, stride=1, downsample=None):
         super(BasicBlock, self).__init__()
         self.act = act
+
         self.conv1 = conv3x3(inplanes, planes, stride)
         self.bn1 = nn.BatchNorm2d(planes * 4)
         self.conv2 = conv3x3(planes, planes)
@@ -84,7 +86,6 @@ class Bottleneck(nn.Module):
 
     def __init__(self, inplanes, planes, stride=1, downsample=None):
         super(Bottleneck, self).__init__()
-
         self.act = act()
         self.conv1 = conv(inplanes, planes, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm2d(planes * 4)
@@ -92,6 +93,7 @@ class Bottleneck(nn.Module):
                              padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(planes * 4)
         self.conv3 = conv(planes, planes * self.expansion, kernel_size=1, bias=False)
+
         self.bn3 = nn.BatchNorm2d(planes * 4 * self.expansion)
         self.downsample = downsample
         self.stride = stride
@@ -123,6 +125,7 @@ class ResNet(nn.Module):
         super(ResNet, self).__init__()
         
         self.act = act
+
         self.deep_base = deep_base
         if not self.deep_base:
             self.inplanes = 64 // factor
@@ -211,6 +214,7 @@ def resnet50(pretrained=False,  quaternion=True, **kwargs):
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
+
     set_ops(quaternion)
 
     model = ResNet(Bottleneck, [3, 4, 6, 3], **kwargs)

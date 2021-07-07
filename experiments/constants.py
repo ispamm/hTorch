@@ -7,6 +7,7 @@ TEST_SPLIT = 0.5
 WIDTH = 384
 HEIGHT = 384
 
+
 # Training options
 DEEP_SUPERVISION = False
 DATA_SIZE_TRAIN = 1000
