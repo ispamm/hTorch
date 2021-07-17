@@ -17,7 +17,7 @@ from ..crf import dense_crf_wrapper
 import configparser
 
 config = configparser.SafeConfigParser()
-config.read("../constants.cfg")
+config.read("htorch/experiments/constants.cfg")
 LEARNING_RATE = config.getfloat("training", "learning_rate")
 
 def set_ops(quaternion):

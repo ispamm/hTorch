@@ -11,7 +11,7 @@ import random
 # constants
 import configparser
 config = configparser.SafeConfigParser()
-config.read("./constants.cfg")
+config.read("htorch/experiments/constants.cfg")
 BATCH_SIZE = config.getint("dataset", "batch_size")
 REPETITIONS = config.getint("dataset", "repetitions")
 SHUFFLE = config.getboolean("dataset", "shuffle")

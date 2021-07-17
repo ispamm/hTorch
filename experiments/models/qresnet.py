@@ -6,11 +6,6 @@ from htorch.quaternion import *
 from htorch.layers import QConv2d
 from htorch.functions import QModReLU
 
-# constants
-import configparser
-config = configparser.SafeConfigParser()
-config.read("./constants.cfg")
-
 def set_ops(quaternion):
     global conv, act, factor
     conv = QConv2d if quaternion else nn.Conv2d
