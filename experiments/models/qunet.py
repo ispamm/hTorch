@@ -11,8 +11,14 @@ import torch.nn as nn
 from ..madgrad import MADGRAD
 from ..loss import FocalTverskyLoss
 from ..utils import f1_score
-from ..constants import *
 from ..crf import dense_crf_wrapper
+
+# constants
+import configparser
+
+config = configparser.SafeConfigParser()
+config.read("../constants.cfg")
+LEARNING_RATE = config.getfloat("training", "learning_rate")
 
 def set_ops(quaternion):
     global conv, act, factor
@@ -26,7 +32,7 @@ def double_conv(in_channels, out_channels):
         act(),
         conv(out_channels, out_channels, 3, padding=1),
         act()
-    )   
+    )
 
 
 class UNet(pl.LightningModule):
@@ -39,47 +45,47 @@ class UNet(pl.LightningModule):
 
         self.dconv_down2 = double_conv(64 // factor, 128 // factor)
         self.dconv_down3 = double_conv(128 // factor, 256 // factor)
-        self.dconv_down4 = double_conv(256 // factor, 512 // factor)        
+        self.dconv_down4 = double_conv(256 // factor, 512 // factor)
 
         self.maxpool = nn.MaxPool2d(2)
-        self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)        
-        
+        self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+
         self.dconv_up3 = double_conv((256 + 512) // factor, 256 // factor)
         self.dconv_up2 = double_conv((128 + 256) // factor, 128 // factor)
         self.dconv_up1 = double_conv((128 + 64) // factor, 64 // factor)
-        
+
         self.conv_last = nn.Conv2d(64, n_class, 1)
-        
-        
+
+
     def forward(self, x):
         conv1 = self.dconv_down1(x)
         x = self.maxpool(conv1)
 
         conv2 = self.dconv_down2(x)
         x = self.maxpool(conv2)
-        
+
         conv3 = self.dconv_down3(x)
-        x = self.maxpool(conv3)   
-        
+        x = self.maxpool(conv3)
+
         x = self.dconv_down4(x)
-        
-        x = self.upsample(x)        
+
+        x = self.upsample(x)
         x = torch.cat([x, conv3], dim=1)
-        
+
         x = self.dconv_up3(x)
-        x = self.upsample(x)        
-        x = torch.cat([x, conv2], dim=1)       
+        x = self.upsample(x)
+        x = torch.cat([x, conv2], dim=1)
 
         x = self.dconv_up2(x)
-        x = self.upsample(x)        
-        x = torch.cat([x, conv1], dim=1)   
-        
+        x = self.upsample(x)
+        x = torch.cat([x, conv1], dim=1)
+
         x = self.dconv_up1(x)
-        
+
         out = self.conv_last(x)
-        
+
         return out
-    
+
     def configure_optimizers(self):
         optimizer = MADGRAD(self.parameters(), lr=LEARNING_RATE)
         return optimizer
@@ -90,7 +96,7 @@ class UNet(pl.LightningModule):
 
     def training_step(self, train_batch, batch_idx):
         inputs, labels = train_batch
-        outputs = self.forward(inputs) 
+        outputs = self.forward(inputs)
 
         probs = torch.sigmoid(outputs).data.cpu().numpy()
         crf = np.stack(list(map(dense_crf_wrapper, zip(inputs.cpu().numpy(), probs))))

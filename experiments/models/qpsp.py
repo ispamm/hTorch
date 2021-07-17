@@ -10,15 +10,23 @@ from ..madgrad import MADGRAD
 from .qresnet import resnet50, resnet101, resnet152
 from ..loss import FocalTverskyLoss
 from ..utils import f1_score
-from ..constants import *
 from ..crf import dense_crf_wrapper
+
+# constants
+import configparser
+
+config = configparser.SafeConfigParser()
+config.read("../constants.cfg")
+LEARNING_RATE = config.getfloat("training", "learning_rate")
+ALPHA_AUX = config.getfloat("psp", "alpha_aux")
+LAYERS = config.getint("psp", "layers")
+DROPOUT = config.getint("psp", "dropout")
 
 def set_ops(quaternion):
     global conv, act, factor
     conv = QConv2d if quaternion else nn.Conv2d
     act = QModReLU if quaternion else nn.ReLU
     factor = 4 if quaternion else 1
-
 
 
 class PPM(torch.nn.Module):
@@ -46,7 +54,8 @@ class PPM(torch.nn.Module):
 
 
 class PSPNet(pl.LightningModule):
-    def __init__(self, quaternion=True, layers=50, bins=(1, 2, 3, 6), dropout=0.1, classes=10, zoom_factor=8, use_ppm=True,
+    def __init__(self, quaternion=True, layers=LAYERS, bins=(1, 2, 3, 6), dropout=DROPOUT, classes=10, zoom_factor=8,
+                 use_ppm=True,
                  pretrained=False, training=True):
         super(PSPNet, self).__init__()
         assert layers in [50, 101, 152]
@@ -55,10 +64,9 @@ class PSPNet(pl.LightningModule):
         assert zoom_factor in [1, 2, 4, 8]
         self.zoom_factor = zoom_factor
         self.use_ppm = use_ppm
-        
+
         set_ops(quaternion)
         self.act = act
-
 
         if layers == 50:
             resnet = resnet50(pretrained=pretrained, quaternion=quaternion)
@@ -101,7 +109,7 @@ class PSPNet(pl.LightningModule):
                 self.act(),
 
                 nn.Dropout2d(p=dropout),
-                nn.Conv2d(256, classes, kernel_size=1)
+                nn.Conv2d(256, kernel_size=1)
             )
 
     def forward(self, x, y=None):
@@ -123,7 +131,7 @@ class PSPNet(pl.LightningModule):
         if self.zoom_factor != 1:
             x = F.interpolate(x, size=(h, w), mode='bilinear', align_corners=True)
         if self.training:
-          
+
             aux = self.aux(x_tmp)
             if self.zoom_factor != 1:
                 aux = F.interpolate(aux, size=(h, w), mode='bilinear', align_corners=True)
@@ -143,7 +151,7 @@ class PSPNet(pl.LightningModule):
 
     def training_step(self, train_batch, batch_idx):
         inputs, labels = train_batch
-        outputs, main_loss, aux_loss = self.forward(inputs, labels) 
+        outputs, main_loss, aux_loss = self.forward(inputs, labels)
 
         probs = torch.sigmoid(outputs).data.cpu().numpy()
         crf = np.stack(list(map(dense_crf_wrapper, zip(inputs.cpu().numpy(), probs))))

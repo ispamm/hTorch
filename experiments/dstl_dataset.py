@@ -8,7 +8,20 @@ import pytorch_lightning as pl
 import cv2
 import random 
 
-from .constants import *
+# constants
+import configparser
+config = configparser.SafeConfigParser()
+config.read("./constants.cfg")
+BATCH_SIZE = config.getint("dataset", "batch_size")
+REPETITIONS = config.getint("dataset", "repetitions")
+SHUFFLE = config.getboolean("dataset", "shuffle")
+TRAIN_SPLIT = config.getfloat("dataset", "train_split")
+TEST_SPLIT = config.getfloat("dataset", "test_split")
+WIDTH = config.getint("dataset", "width")
+HEIGHT = config.getint("dataset", "height")
+DATA_SIZE_TRAIN = config.getint("dataset", "data_size_train")
+DATA_SIZE_VAL = config.getint("dataset", "data_size_val")
+
 
 file_names = pd.read_csv("train_wkt_v4.csv").ImageId.unique()
 

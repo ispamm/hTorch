@@ -25,7 +25,6 @@ import torch.utils.checkpoint as checkpoint
 from htorch.layers import QLinear, QConvTranspose2d
 from htorch.functions import QModReLU
 
-
 from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from timm.models.helpers import build_model_with_cfg, overlay_external_default_cfg
 from timm.models.layers import PatchEmbed, Mlp, DropPath, to_2tuple, trunc_normal_
@@ -35,14 +34,24 @@ from timm.models.vision_transformer import checkpoint_filter_fn, _init_vit_weigh
 from ..madgrad import MADGRAD
 from ..loss import FocalTverskyLoss
 from ..utils import f1_score
-from ..constants import *
 from ..crf import dense_crf_wrapper
+
+# constants
+import configparser
+
+config = configparser.SafeConfigParser()
+config.read("../constants.cfg")
+
+WIDTH = config.getint("dataset", "width")
+HEIGHT = config.getint("dataset", "height")
+LEARNING_RATE = config.getfloat("training", "learning_rate")
 
 _logger = logging.getLogger(__name__)
 
 act = nn.GELU
 lin = nn.Linear
 factor = 1
+
 
 def set_ops(quaternion):
     global lin, conv_transp, act, factor
@@ -53,6 +62,7 @@ def set_ops(quaternion):
 
 
 _logger = logging.getLogger(__name__)
+
 
 def _cfg(url='', **kwargs):
     return {
@@ -73,7 +83,8 @@ default_cfgs = {
         input_size=(3, 384, 384), crop_pct=1.0),
 
     'swin_base_patch4_window7_224': _cfg(
-        url='https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_base_patch4_window7_224_22kto1k.pth', input_size=(3, 384, 384),
+        url='https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_base_patch4_window7_224_22kto1k.pth',
+        input_size=(3, 384, 384),
 
     ),
 
@@ -345,8 +356,8 @@ class PatchMerging(nn.Module):
     def __init__(self, input_resolution, dim, norm_layer=nn.LayerNorm):
         super().__init__()
         self.input_resolution = input_resolution
-        self.dim = dim 
-        self.reduction = lin(dim, 2* dim // factor, bias=False)
+        self.dim = dim
+        self.reduction = lin(dim, 2 * dim // factor, bias=False)
         self.norm = norm_layer(dim)
 
     def forward(self, x):
@@ -365,7 +376,7 @@ class PatchMerging(nn.Module):
         x2 = x[:, 0::2, 1::2, :]  # B H/2 W/2 C
         x3 = x[:, 1::2, 1::2, :]  # B H/2 W/2 C
         x = torch.cat([x0, x1, x2, x3], -1)  # B H/2 W/2 4*C
-        x = x.view(B, -1,  C).squeeze(0)  # B H/2*W/2 4*C
+        x = x.view(B, -1, C).squeeze(0)  # B H/2*W/2 4*C
         x = self.norm(x)
         x = self.reduction(x)
         return x
@@ -493,7 +504,6 @@ class SwinTransformer(pl.LightningModule):
         num_patches = self.patch_embed.num_patches
         self.patch_grid = self.patch_embed.grid_size
 
-
         # absolute position embedding
         if self.ape:
             self.absolute_pos_embed = nn.Parameter(torch.zeros(1, num_patches, embed_dim))
@@ -527,14 +537,19 @@ class SwinTransformer(pl.LightningModule):
         self.norm = norm_layer(self.num_features)
         self.avgpool = nn.AdaptiveAvgPool1d(1)
 
-        self.upconv1 = conv_transp(self.num_features//(factor), self.num_features//(2*factor), 4, stride=2, padding=1)
-        self.upconv2 = conv_transp(self.num_features//(2*factor), self.num_features//(4*factor), 4, stride=2, padding=1)
-        self.upconv3 = conv_transp(self.num_features//(4*factor), self.num_features//(8*factor), 4, stride=2, padding=1)
-        self.upconv4 = conv_transp(self.num_features//(8*factor), self.num_features//(16*factor), 4, stride=2, padding=1)
-        self.upconv5 = conv_transp(self.num_features//(16*factor), self.num_features//(32*factor), 4, stride=2, padding=1)
+        self.upconv1 = conv_transp(self.num_features // (factor), self.num_features // (2 * factor), 4, stride=2,
+                                   padding=1)
+        self.upconv2 = conv_transp(self.num_features // (2 * factor), self.num_features // (4 * factor), 4, stride=2,
+                                   padding=1)
+        self.upconv3 = conv_transp(self.num_features // (4 * factor), self.num_features // (8 * factor), 4, stride=2,
+                                   padding=1)
+        self.upconv4 = conv_transp(self.num_features // (8 * factor), self.num_features // (16 * factor), 4, stride=2,
+                                   padding=1)
+        self.upconv5 = conv_transp(self.num_features // (16 * factor), self.num_features // (32 * factor), 4, stride=2,
+                                   padding=1)
 
-        self.head = nn.Conv2d(self.num_features//32, num_classes, kernel_size=(3,3), padding=1) if num_classes > 0 else nn.Identity()
-
+        self.head = nn.Conv2d(self.num_features // 32, num_classes, kernel_size=(3, 3),
+                              padding=1) if num_classes > 0 else nn.Identity()
 
         assert weight_init in ('jax', 'jax_nlhb', 'nlhb', '')
         head_bias = -math.log(self.num_classes) if 'nlhb' in weight_init else 0.
@@ -553,7 +568,7 @@ class SwinTransformer(pl.LightningModule):
         return {'relative_position_bias_table'}
 
     def forward_features(self, x):
-        
+
         input_shape = x.shape[-2:]
 
         x = self.patch_embed(x)
@@ -561,9 +576,9 @@ class SwinTransformer(pl.LightningModule):
             x = x + self.absolute_pos_embed
         x = self.pos_drop(x)
         x = self.layers(x)
-        x = self.norm(x)  # B L C 
-        x = x.view(-1, x.size(2), int(x.size(1)**0.5), int(x.size(1)**0.5))
-      
+        x = self.norm(x)  # B L C
+        x = x.view(-1, x.size(2), int(x.size(1) ** 0.5), int(x.size(1) ** 0.5))
+
         x = self.upconv1(x)
         x = self.upconv2(x)
         x = self.upconv3(x)
@@ -571,7 +586,6 @@ class SwinTransformer(pl.LightningModule):
         x = self.upconv5(x)
 
         return x
-    
 
     def forward(self, x):
         x = self.forward_features(x)
@@ -588,14 +602,14 @@ class SwinTransformer(pl.LightningModule):
 
     def training_step(self, train_batch, batch_idx):
         inputs, labels = train_batch
-        outputs = self.forward(inputs) 
+        outputs = self.forward(inputs)
 
         probs = torch.sigmoid(outputs).data.cpu().numpy()
         crf = np.stack(list(map(dense_crf_wrapper, zip(inputs.cpu().numpy(), probs))))
         crf = np.ascontiguousarray(crf)
         f1_crf = f1_score(torch.from_numpy(crf).to(self.device), labels)
 
-        loss =  self.focal_tversky_loss(outputs.float(), labels.float())
+        loss = self.focal_tversky_loss(outputs.float(), labels.float())
         f1 = f1_score(outputs, labels)
 
         self.log('train_loss', loss)
@@ -620,7 +634,6 @@ class SwinTransformer(pl.LightningModule):
         self.log('val_f1', f1)
 
 
-
 def _create_swin_transformer(variant, pretrained=False, default_cfg=None, **kwargs):
     if default_cfg is None:
         default_cfg = deepcopy(default_cfgs[variant])
@@ -642,7 +655,6 @@ def _create_swin_transformer(variant, pretrained=False, default_cfg=None, **kwar
         **kwargs)
 
     return model
-
 
 
 @register_model
