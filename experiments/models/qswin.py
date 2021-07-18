@@ -612,9 +612,6 @@ class SwinTransformer(pl.LightningModule):
         loss = self.focal_tversky_loss(outputs.float(), labels.float())
         f1 = f1_score(outputs, labels)
 
-        self.log('train_loss', loss)
-        self.log('train_f1', f1)
-        self.log('train_f1_crf', f1_crf)
         return loss
 
     def validation_step(self, val_batch, batch_idx):
@@ -628,10 +625,6 @@ class SwinTransformer(pl.LightningModule):
 
         loss = self.focal_tversky_loss(outputs.float(), labels.float())
         f1 = f1_score(outputs, labels)
-
-        self.log('val_loss', loss)
-        self.log('val_f1_crf', f1_crf)
-        self.log('val_f1', f1)
 
         return loss
 
