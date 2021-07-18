@@ -633,6 +633,8 @@ class SwinTransformer(pl.LightningModule):
         self.log('val_f1_crf', f1_crf)
         self.log('val_f1', f1)
 
+        return loss
+
 
 def _create_swin_transformer(variant, pretrained=False, default_cfg=None, **kwargs):
     if default_cfg is None:
