@@ -1,4 +1,9 @@
 --find-links https://download.pytorch.org/whl/torch_stable.html
+git+https://github.com/lucasb-eyer/pydensecrf.git
+kaggle
+gdown
+pytorch-lightning
+wandb
 numpy==1.20.1
 torch==1.8.0
 scipy==1.6.1
