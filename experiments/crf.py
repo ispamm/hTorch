@@ -7,7 +7,7 @@ from .utils import to_rgb
 # constants
 import configparser
 config = configparser.SafeConfigParser()
-config.read("htorch/experiments/constants.cfg")
+config.read("hTorch/experiments/constants.cfg")
 MAX_ITER =  config.getint("crf", "max_iter")
 POS_W = config.getint("crf", "pos_w")
 POS_XY_STD = config.getint("crf", "pos_xy_std")

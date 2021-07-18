@@ -40,7 +40,7 @@ from ..crf import dense_crf_wrapper
 import configparser
 
 config = configparser.SafeConfigParser()
-config.read("htorch/experiments/constants.cfg")
+config.read("hTorch/experiments/constants.cfg")
 
 WIDTH = config.getint("dataset", "width")
 HEIGHT = config.getint("dataset", "height")
