@@ -626,7 +626,7 @@ class SwinTransformer(pl.LightningModule):
         loss = self.focal_tversky_loss(outputs.float(), labels.float())
         f1 = f1_score(outputs, labels)
 
-        return loss
+        return {"val_loss":loss}
 
 
 def _create_swin_transformer(variant, pretrained=False, default_cfg=None, **kwargs):
