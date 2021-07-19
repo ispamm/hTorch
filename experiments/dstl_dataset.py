@@ -139,8 +139,10 @@ transform = [
     RandomHorizontalFlip
 ]
 
-def get_loader(file_names, train=True):
-    if train:
+def get_loader(phase):
+
+    file_names = eval("file_names_" + phase)
+    if phase == "train":
         file_names = np.repeat(file_names_train, REPETITIONS)
         random.shuffle(file_names)
     
