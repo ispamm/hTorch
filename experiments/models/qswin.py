@@ -14,10 +14,6 @@ from copy import deepcopy
 from typing import Optional
 import numpy as np
 
-import pdb
-
-import pytorch_lightning as pl
-
 import torch
 import torch.nn as nn
 import torch.utils.checkpoint as checkpoint
@@ -235,7 +231,7 @@ class WindowAttention(nn.Module):
         return x
 
 
-class SwinTransformerBlock(pl.LightningModule):
+class SwinTransformerBlock(nn.Module):
     r""" Swin Transformer Block.
     Args:
         dim (int): Number of input channels.
@@ -591,42 +587,6 @@ class SwinTransformer(nn.Module):
         x = self.forward_features(x)
         x = self.head(x)
         return x
-
-    def configure_optimizers(self):
-        optimizer = MADGRAD(self.parameters(), lr=LEARNING_RATE)
-        return optimizer
-
-    def focal_tversky_loss(self, x, y):
-        loss = FocalTverskyLoss()(x, y)
-        return loss
-
-    def training_step(self, train_batch, batch_idx):
-        inputs, labels = train_batch
-        outputs = self.forward(inputs)
-
-        probs = torch.sigmoid(outputs).data.cpu().numpy()
-        crf = np.stack(list(map(dense_crf_wrapper, zip(inputs.cpu().numpy(), probs))))
-        crf = np.ascontiguousarray(crf)
-        f1_crf = f1_score(torch.from_numpy(crf).to(self.device), labels)
-
-        loss = self.focal_tversky_loss(outputs.float(), labels.float())
-        f1 = f1_score(outputs, labels)
-
-        return loss
-
-    def validation_step(self, val_batch, batch_idx):
-        inputs, labels = val_batch
-        outputs = self.forward(inputs)
-
-        probs = torch.sigmoid(outputs).data.cpu().numpy()
-        crf = np.stack(list(map(dense_crf_wrapper, zip(inputs.cpu().numpy(), probs))))
-        crf = np.ascontiguousarray(crf)
-        f1_crf = f1_score(torch.from_numpy(crf).to(self.device), labels)
-
-        loss = self.focal_tversky_loss(outputs.float(), labels.float())
-        f1 = f1_score(outputs, labels)
-
-        return {"val_loss":loss}
 
 
 def _create_swin_transformer(variant, pretrained=False, default_cfg=None, **kwargs):

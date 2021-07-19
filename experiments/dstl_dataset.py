@@ -133,31 +133,19 @@ def RandomHorizontalFlip(img, mask):
     return img, mask
 
 
-class LitDSTL(pl.LightningDataModule):
+transform = [
+    RandomCrop,
+    RandomVerticalFlip,
+    RandomHorizontalFlip
+]
 
-    def __init__(self):
-        super().__init__()
-        self.transform = [
-            RandomCrop,
-            RandomVerticalFlip,
-            RandomHorizontalFlip
-        ]
+def get_loader(file_names, train=True):
+    if train:
+        file_names = np.repeat(file_names_train, REPETITIONS)
+        random.shuffle(file_names)
+    
+    data = DSTLDataset(repeated, transform=transform)
+    loader = torch.utils.data.DataLoader(train, batch_size=BATCH_SIZE, shuffle=SHUFFLE, pin_memory=True,
+                                        num_workers=0, drop_last=True)
 
-    def train_dataloader(self):
-        repeated = np.repeat(file_names_train, REPETITIONS)
-        random.shuffle(repeated)
-        
-        train = DSTLDataset(repeated, transform=self.transform)
-        loader = torch.utils.data.DataLoader(train, batch_size=BATCH_SIZE, shuffle=SHUFFLE, pin_memory=True,
-                                             num_workers=0, drop_last=True)
-        return loader
-
-    def val_dataloader(self):
-        val = DSTLDataset(file_names_val, transform=self.transform)
-        return torch.utils.data.DataLoader(val, batch_size=BATCH_SIZE, shuffle=SHUFFLE, pin_memory=True, num_workers=0, drop_last=True)
-
-
-    def test_dataloader(self):
-        test = DSTLDataset(file_names_test, transform=self.transform)
-        return torch.utils.data.DataLoader(test, batch_size=BATCH_SIZE, shuffle=SHUFFLE, pin_memory=True, num_workers=0, drop_last=True)
-
+    return loader

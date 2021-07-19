@@ -2,7 +2,6 @@
 credit: https://github.com/usuyama/pytorch-unet/blob/master/pytorch_unet.py
 """
 
-import pytorch_lightning as pl
 from htorch.layers import QConv2d
 from htorch.functions import QModReLU
 import torch
@@ -35,7 +34,7 @@ def double_conv(in_channels, out_channels):
     )
 
 
-class UNet(pl.LightningModule):
+class UNet(nn.Module):
     def __init__(self, quaternion=True, n_class=10):
         super().__init__()
 
@@ -85,46 +84,3 @@ class UNet(pl.LightningModule):
         out = self.conv_last(x)
 
         return out
-
-    def configure_optimizers(self):
-        optimizer = MADGRAD(self.parameters(), lr=LEARNING_RATE)
-        return optimizer
-
-    def focal_tversky_loss(self, x, y):
-        loss = FocalTverskyLoss()(x, y)
-        return loss
-
-    def training_step(self, train_batch, batch_idx):
-        inputs, labels = train_batch
-        outputs = self.forward(inputs)
-
-        probs = torch.sigmoid(outputs).data.cpu().numpy()
-        crf = np.stack(list(map(dense_crf_wrapper, zip(inputs.cpu().numpy(), probs))))
-        crf = np.ascontiguousarray(crf)
-        f1_crf = f1_score(torch.from_numpy(crf).to(self.device), labels)
-
-        loss =  self.focal_tversky_loss(outputs.float(), labels.float())
-        f1 = f1_score(outputs, labels)
-
-        self.log('train_loss', loss)
-        self.log('train_f1', f1)
-        self.log('train_f1_crf', f1_crf)
-        return loss
-
-    def validation_step(self, val_batch, batch_idx):
-        inputs, labels = val_batch
-        outputs = self.forward(inputs)
-
-
-        probs = torch.sigmoid(outputs).data.cpu().numpy()
-        crf = np.stack(list(map(dense_crf_wrapper, zip(inputs.cpu().numpy(), probs))))
-        crf = np.ascontiguousarray(crf)
-        f1_crf = f1_score(torch.from_numpy(crf).to(self.device), labels)
-
-        loss = self.focal_tversky_loss(outputs.float(), labels.float())
-        f1 = f1_score(outputs, labels)
-
-        self.log('val_loss', loss)
-        self.log('val_f1_crf', f1_crf)
-        self.log('val_f1', f1)
-
