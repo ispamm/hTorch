@@ -2,7 +2,7 @@ import pydensecrf.densecrf as dcrf
 import pydensecrf.utils as utils
 import numpy as np
 
-from .utils import to_rgb
+from utils import to_rgb
 
 # constants
 import configparser

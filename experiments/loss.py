@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from .utils import classes_statistics
+from utils import classes_statistics
 
 class FocalTverskyLoss(nn.Module):
     def __init__(self):

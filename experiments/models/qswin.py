@@ -27,10 +27,10 @@ from timm.models.layers import PatchEmbed, Mlp, DropPath, to_2tuple, trunc_norma
 from timm.models.registry import register_model
 from timm.models.vision_transformer import checkpoint_filter_fn, _init_vit_weights
 
-from ..madgrad import MADGRAD
-from ..loss import FocalTverskyLoss
-from ..utils import f1_score
-from ..crf import dense_crf_wrapper
+from madgrad import MADGRAD
+from loss import FocalTverskyLoss
+from utils import f1_score
+from crf import dense_crf_wrapper
 
 # constants
 import configparser

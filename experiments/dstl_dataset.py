@@ -4,7 +4,6 @@ import pandas as pd
 import tifffile as tiff
 from shapely.wkt import loads as wkt_loads
 from shapely.geometry import MultiPolygon, Polygon
-import pytorch_lightning as pl
 import cv2
 import random 
 
@@ -146,8 +145,8 @@ def get_loader(phase):
         file_names = np.repeat(file_names_train, REPETITIONS)
         random.shuffle(file_names)
     
-    data = DSTLDataset(repeated, transform=transform)
-    loader = torch.utils.data.DataLoader(train, batch_size=BATCH_SIZE, shuffle=SHUFFLE, pin_memory=True,
+    data = DSTLDataset(file_names, transform=transform)
+    loader = torch.utils.data.DataLoader(data, batch_size=BATCH_SIZE, shuffle=SHUFFLE, pin_memory=True,
                                         num_workers=0, drop_last=True)
 
     return loader
