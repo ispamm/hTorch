@@ -48,7 +48,6 @@ act = nn.GELU
 lin = nn.Linear
 factor = 1
 
-
 def set_ops(quaternion):
     global lin, conv_transp, act, factor
     conv_transp = QConvTranspose2d if quaternion else nn.ConvTranspose2d
@@ -117,7 +116,6 @@ default_cfgs = {
         num_classes=21841),
 
 }
-import pdb
 
 
 def window_partition(x, window_size: int):
@@ -353,7 +351,7 @@ class PatchMerging(nn.Module):
         super().__init__()
         self.input_resolution = input_resolution
         self.dim = dim
-        self.reduction = lin(dim, 2 * dim // factor, bias=False)
+        self.reduction = lin(4 * dim // factor, 2 * dim // factor, bias=False)
         self.norm = norm_layer(dim)
 
     def forward(self, x):
@@ -374,6 +372,8 @@ class PatchMerging(nn.Module):
         x = torch.cat([x0, x1, x2, x3], -1)  # B H/2 W/2 4*C
         x = x.view(B, -1, C).squeeze(0)  # B H/2*W/2 4*C
         x = self.norm(x)
+        if factor == 1:
+            x = torch.cat([*torch.chunk(x, 4, 1)], 2).squeeze()
         x = self.reduction(x)
         return x
 

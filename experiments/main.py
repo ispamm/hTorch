@@ -17,9 +17,9 @@ from crf import dense_crf_wrapper
 
 parser = argparse.ArgumentParser(description='htorch training and testing')
 parser.add_argument('-m', '--model', help='model to train, choose from: {psp, swin, unet}', required=True)
-parser.add_argument('-q', '--quaternion', help='wheter to use quaternions', action='store_true')
+parser.add_argument('-q', '--quaternion', help='wheter to use quaternions', action='store_true', default=False)
 parser.add_argument('-s', '--save-dir', help='where to save checkpoint files', required=True)
-parser.add_argument('-l', '--save-last', help='save only last epoch', action='store_true')
+parser.add_argument('-l', '--save-last', help='save only last epoch', action='store_true', default=False)
 args = parser.parse_args()
 
 config = configparser.ConfigParser()
