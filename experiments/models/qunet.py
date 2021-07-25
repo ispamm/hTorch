@@ -67,9 +67,7 @@ class UNet(nn.Module):
         x = self.maxpool(conv3)
 
         x = self.dconv_down4(x)
-        print(type(x))
         x = self.upsample(x)
-        print(type(x), type(conv3))
         x = torch.cat([x, conv3], dim=1)
 
         x = self.dconv_up3(x)
