@@ -6,20 +6,25 @@ import os
 import sys
 import numpy as np
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 sys.path.append('hTorch/')
 sys.path.append('pytorch-image-models/')
 
 from dstl_dataset import get_loader
 from madgrad import MADGRAD
 from loss import FocalTverskyLoss
-from utils import f1_score, jaccard_score
+from utils import f1_score, jaccard_score, to_rgb
 from crf import dense_crf_wrapper
 
 parser = argparse.ArgumentParser(description='htorch training and testing')
 parser.add_argument('-m', '--model', help='model to train, choose from: {psp, swin, unet}', required=True)
 parser.add_argument('-q', '--quaternion', help='wheter to use quaternions', action='store_true', default=False)
 parser.add_argument('-s', '--save-dir', help='where to save checkpoint files', required=True)
+parser.add_argument('-w', '--checkpoint-weight-path', help='saved checkpoint weight file to resume trainng from')
+parser.add_argument('-o', '--checkpoint-optim-path', help='saved checkpoint optimizer to resume trainng from')
+parser.add_argument('-t', '--test', help='test mode',  action='store_true', default=False)
 parser.add_argument('-l', '--save-last', help='save only last epoch', action='store_true', default=False)
+
 args = parser.parse_args()
 
 config = configparser.ConfigParser()
@@ -57,6 +62,9 @@ def main():
         from models.qunet import UNet
         model = UNet(quaternion = args.quaternion).to(device)
 
+    if args.checkpoint_weight_path:
+        model.load_state_dict(torch.load(args.checkpoint_weight_path))
+
     config_short_name = ""
     for section in config:
         section_dict = config[section]
@@ -71,113 +79,182 @@ def main():
             config_short_name += field 
     config_short_name += get_short_name(model.__class__.__name__)
     print(">"*10, " parameters ", "<"*10, "\n", config_short_name, sep="")
-
-    train_loader, val_loader = get_loader("train"), get_loader("val")
-    optimizer = MADGRAD(model.parameters(), lr = LEARNING_RATE)
-    lr_scheduler = ReduceLROnPlateau(optimizer, 'min')
-    criterion = FocalTverskyLoss()
-
+    
+    # class empirical sigmoid thresholds
     trs = [0.4, 0.1, 0.4, 0.3, 0.3, 0.5, 0.3, 0.6, 0.1, 0.1]
-    dset_loaders = {"train":train_loader, "val":val_loader}
-    dset_sizes = {"train":DATA_SIZE_TRAIN//BATCH_SIZE, "val":DATA_SIZE_VAL//BATCH_SIZE}
-    for epoch in range(NUM_EPOCHS):
 
-        print('-'*40)
-        print('Epoch {}/{}'.format(epoch, NUM_EPOCHS-1))
+    if not args.test:
+        train_loader, val_loader = get_loader("train"), get_loader("val")
+        optimizer = MADGRAD(model.parameters(), lr = LEARNING_RATE)
+        if args.checkpoint_optim_path:
+            optimizer.load_state_dict(torch.load(args.checkpoint_optim_path))
 
-        # Each epoch has a training and validation phase
-        for phase in ['train', 'val']:
-            if phase == 'train':
-                model.train(True)  # Set model to training mode
-            else:
-                model.train(False)  # Set model to evaluate mode
+        lr_scheduler = ReduceLROnPlateau(optimizer, 'min')
+        criterion = FocalTverskyLoss()
 
-            running_loss = 0.0
-            running_metric_iou = 0.0
-            running_metric_f1 = 0.0
-            running_metric_f1_crf = 0.0
-            total = 0
-            # Iterate over data.
-            for data in dset_loaders[phase]:
-                # get the inputs
-                inputs, labels = data
-                inputs, labels = inputs.to(device), labels.to(device)
-                # zero the parameter gradients
-                optimizer.zero_grad()
+        dset_loaders = {"train":train_loader, "val":val_loader}
+        dset_sizes = {"train":DATA_SIZE_TRAIN//BATCH_SIZE, "val":DATA_SIZE_VAL//BATCH_SIZE}
+        for epoch in range(NUM_EPOCHS):
 
-                # forward
-                if phase == "train":
-                    if args.model == "psp":
-                        outputs, main_loss, aux_loss = model(inputs, labels)
-                        loss = main_loss + ALPHA_AUX * aux_loss
-                    else:
-                        outputs = model(inputs)
-                        loss = criterion(outputs, labels)
-                        
+            print('-'*40)
+            print('Epoch {}/{}'.format(epoch, NUM_EPOCHS-1))
+
+            # Each epoch has a training and validation phase
+            for phase in ['train', 'val']:
+                if phase == 'train':
+                    model.train(True)  # Set model to training mode
                 else:
-                    with torch.no_grad():
+                    model.train(False)  # Set model to evaluate mode
+
+                running_loss = 0.0
+                running_metric_iou = 0.0
+                running_metric_f1 = 0.0
+                running_metric_f1_crf = 0.0
+                total = 0
+                # Iterate over data.
+                for data in tqdm(dset_loaders[phase]):
+                    # get the inputs
+                    inputs, labels = data
+                    inputs, labels = inputs.to(device), labels.to(device)
+                    # zero the parameter gradients
+                    optimizer.zero_grad()
+
+                    # forward
+                    if phase == "train":
                         if args.model == "psp":
-                           outputs = model(inputs, labels)
+                            outputs, main_loss, aux_loss = model(inputs, labels)
+                            loss = main_loss + ALPHA_AUX * aux_loss
                         else:
                             outputs = model(inputs)
-
-                # statistics
-                running_loss += float(loss)
-                preds = torch.sigmoid(outputs).detach().cpu()
-                for i in range(10):
-                    preds[:, i, ...] = (preds[:, i, ...] > trs[i])
+                            loss = criterion(outputs, labels)
                             
-                probs = torch.sigmoid(preds).data.cpu().numpy()
-                crf = np.stack(list(map(dense_crf_wrapper, zip(inputs.cpu().numpy(), probs))))
-                
-                for i in range(10):
-                    crf[:, i, ...] = (crf[:, i, ...] > trs[i])
+                    else:
+                        with torch.no_grad():
+                            if args.model == "psp":
+                              outputs = model(inputs, labels)
+                            else:
+                                outputs = model(inputs)
 
-                iou = jaccard_score(labels.detach().cpu(), preds)
-                f1 = f1_score(outputs, labels)
-                f1_crf = f1_score(labels.detach().cpu(), torch.from_numpy(crf).contiguous())
+                    # statistics
+                    running_loss += loss.detach().item()
+                    preds = torch.sigmoid(outputs).detach().cpu()
+                    for i in range(10):
+                        preds[:, i, ...] = (preds[:, i, ...] > trs[i])
+                                
+                    probs = torch.sigmoid(preds).data.cpu().numpy()
+                    crf = np.stack(list(map(dense_crf_wrapper, zip(inputs.cpu().numpy(), probs))))
+                    
+                    for i in range(10):
+                        crf[:, i, ...] = (crf[:, i, ...] > trs[i])
 
-                running_metric_iou += iou
-                running_metric_f1 += f1
-                running_metric_f1_crf += f1_crf
+                    iou = jaccard_score(labels.detach().cpu(), preds)
+                    f1 = f1_score(outputs, labels)
+                    f1_crf = f1_score(labels.detach().cpu(), torch.from_numpy(crf).contiguous())
 
-                total += labels.size(0)
+                    running_metric_iou += iou.detach().item()
+                    running_metric_f1 += f1.detach().item()
+                    running_metric_f1_crf += f1_crf.detach().item()
 
-                if phase == 'train':
-                    loss.backward()                
-                    optimizer.step()
-                    lr_scheduler.step(f1)
-    
-            epoch_loss = running_loss / total
-            epoch_iou = running_metric_iou / total
-            epoch_f1 = running_metric_f1 / total
-            epoch_f1_crf = running_metric_f1_crf / total
-            
-            print('{} Loss: {:.4f} IoU: {:.4f} F1: {:.4f} F1 crf: {:.4f}'.format(
-                phase, epoch_loss, epoch_iou.numpy().round(2), 
-                epoch_f1.cpu().detach().numpy().round(2), epoch_f1_crf.cpu().detach().numpy().round(2)))
+                    total += labels.size(0)
 
-
-            with open(os.path.join(args.save_dir, f"log_{phase[0]}_loss_" + config_short_name + ".txt"), "a") as f:
-                f.write("%s\n" % epoch_loss)
-
-            with open(os.path.join(args.save_dir, f"log_{phase[0]}_iou_" + config_short_name + ".txt"), "a") as f:
-                f.write("%s\n" % epoch_iou)
-
-            with open(os.path.join(args.save_dir, f"log_{phase[0]}_f1_" + config_short_name + ".txt"), "a") as f:
-                f.write("%s\n" % epoch_f1)
-
-            with open(os.path.join(args.save_dir, f"log_{phase[0]}_f1crf_" + config_short_name + ".txt"), "a") as f:
-                f.write("%s\n" % epoch_f1_crf)
-
-        if args.save_last and epoch != 0:
-            os.remove(os.path.join(args.save_dir, f"weight_e_{epoch-1}" + config_short_name))
-            os.remove(os.path.join(args.save_dir, f"optim_e_{epoch-1}" + config_short_name))
-
-        torch.save(model.state_dict(),  os.path.join(args.save_dir, f"weight_e_{epoch}" + config_short_name))
-        torch.save(optimizer.state_dict(),  os.path.join(args.save_dir, f"optim_e_{epoch}" + config_short_name))
+                    if phase == 'train':
+                        loss.backward()                
+                        optimizer.step()
+                        lr_scheduler.step(f1)
         
-        print()
+                epoch_loss = running_loss / total
+                epoch_iou = running_metric_iou / total
+                epoch_f1 = running_metric_f1 / total
+                epoch_f1_crf = running_metric_f1_crf / total
+                
+                print('{} Loss: {:.4f} IoU: {:.4f} F1: {:.4f} F1 crf: {:.4f}'.format(
+                    phase, epoch_loss, epoch_iou, 
+                    epoch_f1, epoch_f1_crf))
+
+
+                with open(os.path.join(args.save_dir, f"log_{phase[:2]}_loss_" + config_short_name + ".txt"), "a") as f:
+                    f.write("%s\n" % epoch_loss)
+
+                with open(os.path.join(args.save_dir, f"log_{phase[:2]}_iou_" + config_short_name + ".txt"), "a") as f:
+                    f.write("%s\n" % epoch_iou)
+
+                with open(os.path.join(args.save_dir, f"log_{phase[:2]}_f1_" + config_short_name + ".txt"), "a") as f:
+                    f.write("%s\n" % epoch_f1)
+
+                with open(os.path.join(args.save_dir, f"log_{phase[:2]}_f1crf_" + config_short_name + ".txt"), "a") as f:
+                    f.write("%s\n" % epoch_f1_crf)
+
+            if args.save_last and epoch != 0:
+                os.remove(os.path.join(args.save_dir, f"weight_e_{epoch-1}" + config_short_name))
+                os.remove(os.path.join(args.save_dir, f"optim_e_{epoch-1}" + config_short_name))
+
+            torch.save(model.state_dict(),  os.path.join(args.save_dir, f"weight_e_{epoch}" + config_short_name))
+            torch.save(optimizer.state_dict(),  os.path.join(args.save_dir, f"optim_e_{epoch}" + config_short_name))
+            
+            print()
+        
+    else:
+        test_loader = get_loader("test")
+        model.train(False)
+
+        test_metric_iou = 0.0
+        test_metric_f1 = 0.0
+        test_metric_f1_crf = 0.0
+        total = 0
+        for data in tqdm(test_loader):
+            # get the inputs
+            inputs, labels = data
+            inputs, labels = inputs.to(device), labels.to(device)
+
+            with torch.no_grad():
+                if args.model == "psp":
+                  outputs = model(inputs, labels)
+                else:
+                    outputs = model(inputs)
+
+            preds = torch.sigmoid(outputs).detach().cpu()
+            for i in range(10):
+                preds[:, i, ...] = (preds[:, i, ...] > trs[i])
+                        
+            probs = torch.sigmoid(preds).data.cpu().numpy()
+            crf = np.stack(list(map(dense_crf_wrapper, zip(inputs.cpu().numpy(), probs))))
+            
+            for i in range(10):
+                crf[:, i, ...] = (crf[:, i, ...] > trs[i])
+
+            iou = jaccard_score(labels.detach().cpu(), preds)
+            f1 = f1_score(outputs, labels)
+            f1_crf = f1_score(labels.detach().cpu(), torch.from_numpy(crf).contiguous())
+
+            test_metric_iou += iou.detach().item()
+            test_metric_f1 += f1.detach().item()
+            test_metric_f1_crf += f1_crf.detach().item()
+
+            total += labels.size(0)
+
+        test_iou = test_metric_iou / total
+        test_f1 = test_metric_f1 / total
+        test_f1_crf = test_metric_f1_crf / total
+        
+        print('Test IoU: {:.4f} F1: {:.4f} F1 crf: {:.4f}'.format(
+            test_iou, 
+            test_f1, test_f1_crf))
+
+
+        with open(os.path.join(args.save_dir, "log_te_iou_" + config_short_name + ".txt"), "a") as f:
+            f.write("%s\n" % test_iou)
+
+        with open(os.path.join(args.save_dir, "log_te_f1_" + config_short_name + ".txt"), "a") as f:
+            f.write("%s\n" % test_f1)
+
+        with open(os.path.join(args.save_dir, "log_te_f1crf_" + config_short_name + ".txt"), "a") as f:
+            f.write("%s\n" % test_f1_crf)
+
+    print()
+
+    plt.figure(figsize=[10,10])
+    plt.imshow(to_rgb(outputs[0].detach().cpu().numpy()))
+    plt.savefig("test.jpg")
 
 if __name__ == '__main__':
     main()
