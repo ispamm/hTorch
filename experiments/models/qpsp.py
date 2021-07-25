@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import numpy as np
 
 from madgrad import MADGRAD
-from qresnet import resnet50, resnet101, resnet152
+from .qresnet import resnet50, resnet101, resnet152
 from loss import FocalTverskyLoss
 from utils import f1_score
 from crf import dense_crf_wrapper
@@ -19,7 +19,7 @@ config.read("hTorch/experiments/constants.cfg")
 LEARNING_RATE = config.getfloat("training", "learning_rate")
 ALPHA_AUX = config.getfloat("psp", "alpha_aux")
 LAYERS = config.getint("psp", "layers")
-DROPOUT = config.getint("psp", "dropout")
+DROPOUT = config.getfloat("psp", "dropout")
 
 def set_ops(quaternion):
     global conv, act, factor
@@ -38,7 +38,7 @@ class PPM(torch.nn.Module):
             self.features.append(nn.Sequential(
                 nn.AdaptiveAvgPool2d(bin),
                 conv(in_dim, reduction_dim, kernel_size=1, bias=False),
-                nn.BatchNorm2d(reduction_dim * 4),
+                nn.BatchNorm2d(reduction_dim * factor),
                 self.act()
 
             ))
@@ -52,7 +52,7 @@ class PPM(torch.nn.Module):
         return torch.cat(out, 1)
 
 
-class PSPNet(pl.LightningModule):
+class PSPNet(nn.Module):
     def __init__(self, quaternion=True, layers=LAYERS, bins=(1, 2, 3, 6), dropout=DROPOUT, classes=10, zoom_factor=8,
                  use_ppm=True,
                  pretrained=False, training=True):
@@ -109,7 +109,7 @@ class PSPNet(pl.LightningModule):
                 self.act(),
 
                 nn.Dropout2d(p=dropout),
-                nn.Conv2d(256, kernel_size=1)
+                nn.Conv2d(256, classes, kernel_size=1)
             )
 
     def forward(self, x, y=None):

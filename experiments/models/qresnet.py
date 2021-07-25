@@ -88,13 +88,13 @@ class Bottleneck(nn.Module):
         super(Bottleneck, self).__init__()
         self.act = act()
         self.conv1 = conv(inplanes, planes, kernel_size=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(planes * 4)
+        self.bn1 = nn.BatchNorm2d(planes * factor)
         self.conv2 = conv(planes, planes, kernel_size=3, stride=stride,
                              padding=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(planes * 4)
+        self.bn2 = nn.BatchNorm2d(planes * factor)
         self.conv3 = conv(planes, planes * self.expansion, kernel_size=1, bias=False)
 
-        self.bn3 = nn.BatchNorm2d(planes * 4 * self.expansion)
+        self.bn3 = nn.BatchNorm2d(planes * factor * self.expansion)
         self.downsample = downsample
         self.stride = stride
 
@@ -153,7 +153,7 @@ class ResNet(nn.Module):
             downsample = nn.Sequential(
                 conv(self.inplanes, planes * block.expansion,
                         kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(planes * 4 * block.expansion),
+                nn.BatchNorm2d(planes * factor * block.expansion),
             )
 
         layers = []

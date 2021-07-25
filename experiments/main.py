@@ -108,7 +108,7 @@ def main():
                 # forward
                 if phase == "train":
                     if args.model == "psp":
-                        outputs, main_loss, aux_loss, f1 = model(inputs, labels)
+                        outputs, main_loss, aux_loss = model(inputs, labels)
                         loss = main_loss + ALPHA_AUX * aux_loss
                     else:
                         outputs = model(inputs)
