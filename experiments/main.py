@@ -54,7 +54,7 @@ def main():
         from models.qswin import SwinTransformer
         model = SwinTransformer(quaternion = args.quaternion).to(device)
     if args.model == "unet":
-        from models.unet import UNet
+        from models.qunet import UNet
         model = UNet(quaternion = args.quaternion).to(device)
 
     config_short_name = ""

@@ -94,11 +94,20 @@ def allclose(input1, input2, *args, **kwargs):
 
 @implements(torch.cat)
 def cat(input, *args, **kwargs):
-    return torch.cat([x.q for x in input], *args, **kwargs)
+    check_list = [isinstance(i, QuaternionTensor) for i in input]
+    if all(check_list):
+        return torch.cat([x.q for x in input], *args, **kwargs)
+    else:
+        return torch.cat([input[i].q if check_list[i] else input[i] for i in range(len(check_list))], *args, **kwargs)
+
 
 @implements(torch.stack)
 def stack(input, *args, **kwargs):
-    return torch.cat([x.q for x in input], *args, **kwargs)
+    check_list = [isinstance(i, QuaternionTensor) for i in input]
+    if all(check_list):
+        return torch.stack([x.q for x in input], *args, **kwargs)
+    else:
+        return torch.stack([input[i].q if check_list[i] else input[i] for i in range(len(check_list))], *args, **kwargs)
 
 @implements(torch.Tensor.neg)
 def neg(input):
@@ -437,6 +446,10 @@ def log(input):
 
 # ----------------------------------- layers ------------------------------------------------
 
+@implements(torch.nn.functional.interpolate)
+def interpolate(input, *args, **kwargs):
+    return torch.nn.functional.interpolate(input.q, *args, **kwargs)
+
 @implements(torch.nn.functional.max_pool2d)
 def max_pool2d(input, *args, **kwargs):
     return torch.nn.functional.max_pool2d(input.q, *args, **kwargs)
@@ -481,9 +494,6 @@ def dropout(input, *args, **kwargs):
 def layer_norm(input, *args, **kwargs):
     return torch.nn.functional.layer_norm(input.q, *args, **kwargs)
 
-@implements(torch.nn.functional.interpolate)
-def interpolate(input, *args, **kwargs):
-    return torch.nn.functional.interpolate(input.q, *args, **kwargs)
 
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
