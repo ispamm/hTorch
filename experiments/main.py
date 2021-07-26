@@ -84,7 +84,7 @@ def main():
     trs = [0.4, 0.1, 0.4, 0.3, 0.3, 0.5, 0.3, 0.6, 0.1, 0.1]
 
     if not args.test:
-        train_loader, val_loader = get_loader("train"), get_loader("val")
+        train_loader, val_loader = get_loader("train", BATCH_SIZE), get_loader("val", 2)
         optimizer = MADGRAD(model.parameters(), lr = LEARNING_RATE)
         if args.checkpoint_optim_path:
             optimizer.load_state_dict(torch.load(args.checkpoint_optim_path))
@@ -185,16 +185,16 @@ def main():
                     f.write("%s\n" % epoch_f1_crf)
 
             if args.save_last and epoch != 0:
-                os.remove(os.path.join(args.save_dir, f"weight_e_{epoch-1}" + config_short_name))
-                os.remove(os.path.join(args.save_dir, f"optim_e_{epoch-1}" + config_short_name))
+                os.remove(os.path.join(args.save_dir, f"weight_e_{epoch-1}_" + config_short_name))
+                os.remove(os.path.join(args.save_dir, f"optim_e_{epoch-1}_" + config_short_name))
 
-            torch.save(model.state_dict(),  os.path.join(args.save_dir, f"weight_e_{epoch}" + config_short_name))
-            torch.save(optimizer.state_dict(),  os.path.join(args.save_dir, f"optim_e_{epoch}" + config_short_name))
+            torch.save(model.state_dict(),  os.path.join(args.save_dir, f"weight_e_{epoch}_" + config_short_name))
+            torch.save(optimizer.state_dict(),  os.path.join(args.save_dir, f"optim_e_{epoch}_" + config_short_name))
             
             print()
         
     else:
-        test_loader = get_loader("test")
+        test_loader = get_loader("test", 2)
         model.train(False)
 
         test_metric_iou = 0.0

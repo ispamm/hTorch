@@ -138,7 +138,7 @@ transform = [
     RandomHorizontalFlip
 ]
 
-def get_loader(phase):
+def get_loader(phase, bs):
 
     file_names = eval("file_names_" + phase)
     if phase == "train":
@@ -146,7 +146,7 @@ def get_loader(phase):
         random.shuffle(file_names)
     
     data = DSTLDataset(file_names, transform=transform)
-    loader = torch.utils.data.DataLoader(data, batch_size=BATCH_SIZE, shuffle=SHUFFLE, pin_memory=True,
+    loader = torch.utils.data.DataLoader(data, batch_size=bs, shuffle=SHUFFLE, pin_memory=True,
                                         num_workers=0, drop_last=True)
 
     return loader
