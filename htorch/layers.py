@@ -75,9 +75,9 @@ class QConv1d(nn.Module):
                               kernel_size=self.kernel_size)
 
         if self.spinor:
-            self.weight = nn.Parameter(quaternion_weight._real_rot_repr)
+            self.weight = nn.Parameter(quaternion_weight._real_rot_repr[...,0])
         else:
-            self.weight = nn.Parameter(quaternion_weight._real_repr)
+            self.weight = nn.Parameter(quaternion_weight._real_repr[...,0])
         
         if self.bias:
             bias = torch.zeros(self.out_channels*4)
