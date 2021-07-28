@@ -117,6 +117,14 @@ def neg(input):
 def pad(input, *args, **kwargs):
     return torch.nn.functional._pad(input.q)
 
+@implements(torch.Tensor.squeeze)
+def squeeze(self, *args, **kwargs):
+    return self.q.squeeze(*args, **kwargs)
+
+@implements(torch.Tensor.unsqueeze)
+def unsqueeze(self, *args, **kwargs):
+    return self.q.unsqueeze(*args, **kwargs)
+
 # -----------------------------activation functions ------------------------------------------
 
 @implements(torch.nn.functional.relu)
