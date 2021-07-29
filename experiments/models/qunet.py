@@ -19,11 +19,13 @@ config = configparser.SafeConfigParser()
 config.read("hTorch/experiments/constants.cfg")
 LEARNING_RATE = config.getfloat("training", "learning_rate")
 
+
 def set_ops(quaternion):
     global conv, act, factor
     conv = QConv2d if quaternion else nn.Conv2d
     act = QModReLU if quaternion else nn.ReLU
     factor = 4 if quaternion else 1
+
 
 def double_conv(in_channels, out_channels):
     return nn.Sequential(
@@ -54,7 +56,6 @@ class UNet(nn.Module):
         self.dconv_up1 = double_conv((128 + 64) // factor, 64 // factor)
 
         self.conv_last = nn.Conv2d(64, n_class, 1)
-
 
     def forward(self, x):
         conv1 = self.dconv_down1(x)

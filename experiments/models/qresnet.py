@@ -1,10 +1,11 @@
-import torch 
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 from htorch.quaternion import *
 from htorch.layers import QConv2d
 from htorch.functions import QModReLU
+
 
 def set_ops(quaternion):
     global conv, act, factor
@@ -13,10 +14,9 @@ def set_ops(quaternion):
     factor = 4 if quaternion else 1
 
 
-
 def conv3x3(in_planes, out_planes, stride=1):
     return conv(in_planes, out_planes, kernel_size=3, stride=stride,
-                   padding=1, bias=False)
+                padding=1, bias=False)
 
 
 class ChannelBlock(nn.Module):
@@ -24,6 +24,7 @@ class ChannelBlock(nn.Module):
     Channel Block for learning channels interactions (from
     Deep Complex Networks)
     """
+
     def __init__(self, inplanes, planes, stride=1):
         super(ChannelBlock, self).__init__()
 
@@ -31,11 +32,11 @@ class ChannelBlock(nn.Module):
 
         self.bn1 = nn.BatchNorm2d(inplanes * 4)
         self.conv1 = conv(inplanes // factor, planes // factor, kernel_size=1, stride=stride,
-                               padding=0, bias=False)
+                          padding=0, bias=False)
 
         self.bn2 = nn.BatchNorm2d(planes * 4)
         self.conv2 = conv(planes // factor, planes // factor, kernel_size=1, stride=stride,
-                               padding=0, bias=False)
+                          padding=0, bias=False)
 
         self.stride = stride
 
@@ -90,7 +91,7 @@ class Bottleneck(nn.Module):
         self.conv1 = conv(inplanes, planes, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm2d(planes * factor)
         self.conv2 = conv(planes, planes, kernel_size=3, stride=stride,
-                             padding=1, bias=False)
+                          padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(planes * factor)
         self.conv3 = conv(planes, planes * self.expansion, kernel_size=1, bias=False)
 
@@ -123,7 +124,7 @@ class ResNet(nn.Module):
 
     def __init__(self, block, layers, num_classes=10, deep_base=True):
         super(ResNet, self).__init__()
-        
+
         self.act = act
 
         self.deep_base = deep_base
@@ -152,7 +153,7 @@ class ResNet(nn.Module):
         if stride != 1 or self.inplanes != planes * block.expansion:
             downsample = nn.Sequential(
                 conv(self.inplanes, planes * block.expansion,
-                        kernel_size=1, stride=stride, bias=False),
+                     kernel_size=1, stride=stride, bias=False),
                 nn.BatchNorm2d(planes * factor * block.expansion),
             )
 
@@ -209,7 +210,7 @@ def resnet34(pretrained=False, quaternion=True, **kwargs):
     return model
 
 
-def resnet50(pretrained=False,  quaternion=True, **kwargs):
+def resnet50(pretrained=False, quaternion=True, **kwargs):
     """Constructs a ResNet-50 model.
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet

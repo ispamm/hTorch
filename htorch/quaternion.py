@@ -3,15 +3,17 @@ import numpy as np
 import warnings
 import functools
 
-
 HANDLEdFUNCTIONS = {}
+
 
 def implements(torch_function):
     """Register a torch function override for ScalarTensor"""
+
     @functools.wraps(torch_function)
     def decorator(func):
         HANDLEdFUNCTIONS[torch_function] = func
         return func
+
     return decorator
 
 
@@ -24,21 +26,26 @@ def shape(self):
     """
     return torch.Tensor.shape.__get__(self.q)
 
+
 @implements(torch.Tensor.T.__get__)
 def T(self):
     return self.q.t()
+
 
 @implements(torch.Tensor.requires_grad.__get__)
 def get_requires_grad(self):
     return self.q.requires_grad
 
+
 @implements(torch.Tensor.grad.__get__)
 def get_grad(self):
     return self.q.grad
 
+
 @implements(torch.Tensor.__getitem__)
 def get_item(self, idx):
     return torch.Tensor.__getitem__(self.q, idx)
+
 
 # ----------------------------------- setters -------------------------------------------------
 
@@ -46,10 +53,12 @@ def get_item(self, idx):
 def set_requires_grad(self, requires_grad):
     self.q.requires_grad = requires_grad
 
+
 @implements(torch.Tensor.grad.__set__)
 def set_grad(self, grad):
     self.q.grad = grad
-    
+
+
 # ----------------------------------- general ------------------------------------------------
 
 @implements(torch.Tensor.dim)
@@ -61,29 +70,36 @@ def dim(self):
 def t(self):
     return self.q.t()
 
+
 @implements(torch.chunk)
 def chunk(input, *args, **kwargs):
     return torch.chunk(input.q, *args, **kwargs)
+
 
 @implements(torch.Tensor.chunk)
 def chunk(input, *args, **kwargs):
     return torch.chunk(input.q, chunks=4, *args, **kwargs)
 
+
 @implements(torch.Tensor.cpu)
 def cpu(self):
     return self.q.cpu()
+
 
 @implements(torch.Tensor.cuda)
 def cuda(self):
     return self.q.cuda()
 
+
 @implements(torch.Tensor.reshape)
 def reshape(self, *args, **kwargs):
     return self.q.reshape(*args, **kwargs)
 
+
 @implements(torch.Tensor.view)
 def view(self, *args, **kwargs):
     return self.q.view(*args, **kwargs)
+
 
 @implements(torch.allclose)
 def allclose(input1, input2, *args, **kwargs):
@@ -91,6 +107,7 @@ def allclose(input1, input2, *args, **kwargs):
         return torch.allclose(input1.q, input2.q)
     else:
         return torch.allclose(input1.q, input2)
+
 
 @implements(torch.cat)
 def cat(input, *args, **kwargs):
@@ -109,21 +126,26 @@ def stack(input, *args, **kwargs):
     else:
         return torch.stack([input[i].q if check_list[i] else input[i] for i in range(len(check_list))], *args, **kwargs)
 
+
 @implements(torch.Tensor.neg)
 def neg(input):
     return input.__class__(-input.q)
+
 
 @implements(torch.nn.functional._pad)
 def pad(input, *args, **kwargs):
     return torch.nn.functional._pad(input.q)
 
+
 @implements(torch.Tensor.squeeze)
 def squeeze(self, *args, **kwargs):
     return self.q.squeeze(*args, **kwargs)
 
+
 @implements(torch.Tensor.unsqueeze)
 def unsqueeze(self, *args, **kwargs):
     return self.q.unsqueeze(*args, **kwargs)
+
 
 # -----------------------------activation functions ------------------------------------------
 
@@ -146,9 +168,11 @@ def conj(self):
 
     return self.__class__(con, False)
 
+
 @implements(torch.conj)
 def conj(input):
     return input.conj()
+
 
 # ----------------------------------- inverse ------------------------------------------------
 
@@ -163,9 +187,11 @@ def inverse(self):
         inverse = self.conj() / self.sq_norm()
     return inverse
 
+
 @implements(torch.inverse)
 def inverse(input):
     return input.inverse()
+
 
 # ----------------------------------- min ------------------------------------------------
 
@@ -173,9 +199,11 @@ def inverse(input):
 def min(self):
     return torch.min(self.q)
 
+
 @implements(torch.min)
 def min(input):
     return input.min()
+
 
 # ----------------------------------- max ------------------------------------------------
 
@@ -183,9 +211,11 @@ def min(input):
 def max(self):
     return torch.max(self.q)
 
+
 @implements(torch.max)
 def max(input):
     return input.max()
+
 
 # ----------------------------------- sum ------------------------------------------------
 
@@ -193,9 +223,11 @@ def max(input):
 def sum(self, *args, **kwargs):
     return torch.sum(self.q, *args, **kwargs)
 
+
 @implements(torch.sum)
 def sum(input, *args, **kwargs):
     return input.sum(*args, **kwargs)
+
 
 # ----------------------------------- mean ------------------------------------------------
 
@@ -203,9 +235,11 @@ def sum(input, *args, **kwargs):
 def mean(self, *args, **kwargs):
     return torch.mean(self.q, *args, **kwargs)
 
+
 @implements(torch.mean)
 def mean(input, *args, **kwargs):
     return input.mean(*args, **kwargs)
+
 
 # ----------------------------------- norm ------------------------------------------------
 
@@ -214,12 +248,13 @@ def norm(self, *args, **kwargs):
     """
     Quaternion (non-squared) norm.
     """
-    return torch.sqrt(self.a**2 + self.b**2 + self.c**2 + self.d**2)
+    return torch.sqrt(self.a ** 2 + self.b ** 2 + self.c ** 2 + self.d ** 2)
 
 
 @implements(torch.linalg.norm)
 def norm(input, *args, **kwargs):
     return input.norm(*args, **kwargs)
+
 
 # ----------------------------------- add ------------------------------------------------
 
@@ -239,31 +274,32 @@ def add(self, other):
                     if self.real_tensor:
                         out = real_repr(out)
                 else:
-                    out = self.q + other                    
+                    out = self.q + other
             elif other.dim() <= 1 and self.dim() > 1:
                 out = torch.cat([self.a + other.unsqueeze(1), self.b, self.c, self.d], 1)
                 if self.real_tensor:
                     out = real_repr(out)
         else:
             out = self.q + other
-                            
+
     else:
         print(self.shape)
         if other.__class__.__name__ == "QuaternionTensor":
-            out = self.q + other.q        
+            out = self.q + other.q
         elif isinstance(other, int):
             out = [self.a + other, self.b, self.c, self.d]
         elif len(other) == 1:
             out = [self.a + other, self.b, self.c, self.d]
         else:
             out = self.q + other
-        
 
     return self.__class__(out)
+
 
 @implements(torch.add)
 def add(input1, input2):
     return input1.add(input2)
+
 
 # ----------------------------------- mul ------------------------------------------------
 
@@ -299,18 +335,19 @@ def mul(self, other):
     elif isinstance(other, torch.Tensor):
         if other.dim() > 1 and other.dim() > 1:
             if other.shape[1] * 4 == self.shape[1]:
-                out = self.q * torch.cat([other]*4, 1)
+                out = self.q * torch.cat([other] * 4, 1)
             else:
                 out = self.q * other
         else:
             if other.dim() == 1 and other.shape[0] == self.shape[0]:
-                out = self.q * torch.stack([other]*self.shape[1], 1)
+                out = self.q * torch.stack([other] * self.shape[1], 1)
             else:
                 out = self.q * other
     else:
         out = self.q * other
 
     return self.__class__(out)
+
 
 @implements(torch.mul)
 def mul(input1, input2):
@@ -323,9 +360,11 @@ def mul(input1, input2):
 def matmul(self, other):
     return torch.matmul(self.q, other)
 
+
 @implements(torch.matmul)
 def matmul(input1, input2):
     return input1.matmul(input2)
+
 
 # ----------------------------------- div ------------------------------------------------
 
@@ -344,22 +383,24 @@ def true_div(self, other):
     elif isinstance(other, torch.Tensor):
         if other.dim() > 1 and self.dim() > 1:
             if other.shape[1] * 4 == self.shape[1]:
-                out = self.q / torch.cat([other]*4, 1)
+                out = self.q / torch.cat([other] * 4, 1)
             else:
                 out = self.q / other
         else:
             if other.dim() == 1 and other.shape[0] == self.shape[0]:
-                out = self.q / torch.stack([other]*self.shape[1], 1)
+                out = self.q / torch.stack([other] * self.shape[1], 1)
             else:
-                out = self.q / other          
+                out = self.q / other
     else:
-        out = self.q / other  
+        out = self.q / other
 
     return self.__class__(out)
+
 
 @implements(torch.div)
 def div(input1, input2):
     return input1.div(input2)
+
 
 # ----------------------------------- pow ------------------------------------------------
 
@@ -385,40 +426,44 @@ def pow(self, n):
     else:
         return torch.pow(self.q, n)
 
+
 @implements(torch.pow)
 def div(input1, input2):
     return input1.pow(input2)
+
 
 # ----------------------------------- exp ------------------------------------------------
 
 @implements(torch.Tensor.exp)
 def exp(self):
-        """
-        Quaternion exponential.
-        """
-        if self.quat_ops:
-            v = self.v
-            a = self.a
-            v_norm = v.norm()
-            exp = torch.exp(a)
-            real = exp * torch.cos(v_norm)
-            if self.dim() > 1:
-                vector = exp * (v / v_norm) * torch.sin(v_norm)
-                out = real + vector
-            else:
-                vector = exp * (v / v_norm) * torch.sin(v_norm)
-                out = torch.cat([
-                    real, vector[1].unsqueeze(0), vector[2].unsqueeze(0), vector[3].unsqueeze(0)
-                ], 0)
-                
-            return self.__class__(out)
-        
+    """
+    Quaternion exponential.
+    """
+    if self.quat_ops:
+        v = self.v
+        a = self.a
+        v_norm = v.norm()
+        exp = torch.exp(a)
+        real = exp * torch.cos(v_norm)
+        if self.dim() > 1:
+            vector = exp * (v / v_norm) * torch.sin(v_norm)
+            out = real + vector
         else:
-            return torch.exp(self.q)
+            vector = exp * (v / v_norm) * torch.sin(v_norm)
+            out = torch.cat([
+                real, vector[1].unsqueeze(0), vector[2].unsqueeze(0), vector[3].unsqueeze(0)
+            ], 0)
+
+        return self.__class__(out)
+
+    else:
+        return torch.exp(self.q)
+
 
 @implements(torch.exp)
 def exp(input):
     return input.exp()
+
 
 # ----------------------------------- log ------------------------------------------------
 
@@ -448,9 +493,11 @@ def log(self):
     else:
         return torch.log(self.q)
 
+
 @implements(torch.log)
 def log(input):
     return input.log()
+
 
 # ----------------------------------- layers ------------------------------------------------
 
@@ -458,45 +505,56 @@ def log(input):
 def interpolate(input, *args, **kwargs):
     return torch.nn.functional.interpolate(input.q, *args, **kwargs)
 
+
 @implements(torch.nn.functional.max_pool2d)
 def max_pool2d(input, *args, **kwargs):
     return torch.nn.functional.max_pool2d(input.q, *args, **kwargs)
+
 
 @implements(torch.conv1d)
 def conv1d(input, *args, **kwargs):
     return torch.conv1d(input.q, *args, **kwargs)
 
+
 @implements(torch.conv2d)
 def conv2d(input, *args, **kwargs):
     return torch.conv2d(input.q, *args, **kwargs)
+
 
 @implements(torch.conv3d)
 def conv3d(input, *args, **kwargs):
     return torch.conv3d(input.q, *args, **kwargs)
 
+
 @implements(torch.conv_transpose1d)
 def conv_transpose1d(input, *args, **kwargs):
     return torch.conv_transpose1d(input.q, *args, **kwargs)
+
 
 @implements(torch.conv_transpose2d)
 def conv_transpose2d(input, *args, **kwargs):
     return torch.conv_transpose2d(input.q, *args, **kwargs)
 
+
 @implements(torch.conv_transpose3d)
 def conv_transpose3d(input, *args, **kwargs):
     return torch.conv_transpose3d(input.q, *args, **kwargs)
+
 
 @implements(torch.nn.functional.batch_norm)
 def bn(input, *args, **kwargs):
     return torch.nn.functional.batch_norm(input.q, *args, **kwargs)
 
+
 @implements(torch.nn.functional.dropout)
 def dropout(input, *args, **kwargs):
     return torch.nn.functional.dropout(input.q, *args, **kwargs)
 
+
 @implements(torch.nn.Dropout)
 def dropout(input, *args, **kwargs):
     return torch.nn.functional.dropout(input.q, *args, **kwargs)
+
 
 @implements(torch.nn.functional.layer_norm)
 def layer_norm(input, *args, **kwargs):
@@ -516,13 +574,14 @@ def get_parts(q):
     @type q: torch.Tensor
     @type dim: int
     """
-    
+
     a, b, c, d = torch.chunk(q, 4, 1)
 
-    return a.transpose(1, 0),\
-           b.transpose(1, 0),\
-           c.transpose(1, 0),\
+    return a.transpose(1, 0), \
+           b.transpose(1, 0), \
+           c.transpose(1, 0), \
            d.transpose(1, 0)
+
 
 def check_q_type(q):
     """
@@ -531,7 +590,7 @@ def check_q_type(q):
     @type q: torch.Tensor/list/tuple
     """
     if isinstance(q, (tuple, list)):
-        
+
         if all(isinstance(i, torch.Tensor) for i in q) == True and len(q) != 0:
             assert len(q) == 4, "Quaternion must have 4 elements."
             if all(i.dim() == 1 for i in q):
@@ -542,6 +601,7 @@ def check_q_type(q):
             q = torch.Tensor(q)
     return q
 
+
 def real_repr(q):
     """
     Gets the real representation of the tensor.
@@ -549,7 +609,7 @@ def real_repr(q):
     @type q: torch.Tensor
     """
     a, b, c, d = get_parts(q)
-    
+
     if all((i.dim() == 1) for i in [a, b, c, d]) == True:
         a = a.view(1, 1)
         b = b.view(1, 1)
@@ -557,9 +617,10 @@ def real_repr(q):
         d = d.view(1, 1)
 
     return torch.cat([torch.cat([a, -b, -c, -d], dim=1),
-                      torch.cat([b,  a, -d,  c], dim=1),
-                      torch.cat([c,  d,  a, -b], dim=1),
-                      torch.cat([d, -c,  b,  a], dim=1)], dim=0)
+                      torch.cat([b, a, -d, c], dim=1),
+                      torch.cat([c, d, a, -b], dim=1),
+                      torch.cat([d, -c, b, a], dim=1)], dim=0)
+
 
 def real_rot_repr(q):
     """
@@ -568,7 +629,7 @@ def real_rot_repr(q):
     @type q: torch.Tensor
     """
     a, b, c, d = get_parts(q)
-    
+
     if all((i.dim() == 1) for i in [a, b, c, d]) == True:
         a = a.view(1, 1)
         b = b.view(1, 1)
@@ -584,11 +645,11 @@ def real_rot_repr(q):
                       2 * (b * c + d * a),
                       1 - 2 * (b ** 2 + d ** 2),
                       2 * (c * d - b * a)], dim=1)
-    row4 = torch.cat([torch.zeros_like(b), 
-                      2 * (b * d - c * a), 
-                      2 * (c * d + b * a), 
+    row4 = torch.cat([torch.zeros_like(b),
+                      2 * (b * d - c * a),
+                      2 * (c * d + b * a),
                       1 - 2 * (b ** 2 + c ** 2)], dim=1)
-    
+
     return torch.cat([row1, row2, row3, row4], dim=0)
 
 
@@ -600,17 +661,17 @@ class QuaternionTensor(torch.Tensor):
     Pytorch function that accepts a torch.Tensor or can be
     used independently for other, more general, applications.    
     """
-    
-    @staticmethod 
+
+    @staticmethod
     def __new__(cls, q=[], real_tensor=False, quat_ops=True, *args, **kwargs):
-        
+
         q = check_q_type(q)
         if real_tensor:
             q = real_repr(q)
         cls.q = q
         cls.device = q.device
-        return super().__new__(cls, q.cpu(), *args, **kwargs) 
-    
+        return super().__new__(cls, q.cpu(), *args, **kwargs)
+
     def __init__(self, q=[], real_tensor=False, quat_ops=True):
         super().__init__()
         """
@@ -621,11 +682,11 @@ class QuaternionTensor(torch.Tensor):
         @type q: torch.Tensor/list/tuple
         @type real_tensor: bool
         """
-        
+
         self.real_tensor = real_tensor
         self.quat_ops = quat_ops
         q = check_q_type(q)
-        
+
         if len(q) != 0:
             if real_tensor:
                 q = real_repr(q)
@@ -635,55 +696,55 @@ class QuaternionTensor(torch.Tensor):
     @property
     def a(self):
         if self.dim() == 1:
-            out = self.q[:self.shape[0]//4]
+            out = self.q[:self.shape[0] // 4]
         else:
-            out = self.q[:, :self.shape[1]//4]
+            out = self.q[:, :self.shape[1] // 4]
         out.quat_ops = False
         return out
 
     @property
     def b(self):
         if self.dim() == 1:
-            step = self.shape[0]//4
-            out = self.q[step:step*2]
+            step = self.shape[0] // 4
+            out = self.q[step:step * 2]
         else:
-            step = self.shape[1]//4
-            out = self.q[:, step:step*2]
-            
+            step = self.shape[1] // 4
+            out = self.q[:, step:step * 2]
+
         out.quat_ops = False
         return out
 
     @property
     def c(self):
         if self.dim() == 1:
-            step = self.shape[0]//4
-            out = self.q[step*2:step*3]
+            step = self.shape[0] // 4
+            out = self.q[step * 2:step * 3]
         else:
-            step = self.shape[1]//4
-            out = self.q[:, step*2:step*3]
+            step = self.shape[1] // 4
+            out = self.q[:, step * 2:step * 3]
 
         out.quat_ops = False
         return out
-    
+
     @property
     def d(self):
         if self.dim() == 1:
-            step = self.shape[0]//4
-            out = self.q[step*3:]
+            step = self.shape[0] // 4
+            out = self.q[step * 3:]
         else:
-            step = self.shape[1]//4
-            out = self.q[:, step*3:]
+            step = self.shape[1] // 4
+            out = self.q[:, step * 3:]
 
         out.quat_ops = False
         return out
-    
+
     # overrides pytorch operations
     def __torch_function__(self, func, types, args=(), kwargs=None):
         if kwargs is None:
             kwargs = {}
         if func not in HANDLEdFUNCTIONS or not all(
-            issubclass(t, QuaternionTensor)
-            for t in types
+                issubclass(t, QuaternionTensor)
+                for t in types
         ):
             return NotImplemented
         return HANDLEdFUNCTIONS[func](*args, **kwargs)
@@ -700,7 +761,7 @@ class QuaternionTensor(torch.Tensor):
         in the interval [0,1)
         """
         return self.__class__(torch.rand(size))
-    
+
     def sq_norm(self):
         """
         Quaternion squared norm.
@@ -720,7 +781,7 @@ class QuaternionTensor(torch.Tensor):
         Real rotation representation.
         """
         return real_rot_repr(self.q)
-    
+
     @property
     def v(self):
         """
@@ -730,9 +791,8 @@ class QuaternionTensor(torch.Tensor):
             out = torch.cat([torch.zeros_like(self.b), self.b, self.c, self.d], 1)
         else:
             out = [torch.zeros_like(self.b), self.b, self.c, self.d]
-        
-        return self.__class__(out)
 
+        return self.__class__(out)
 
     def theta(self):
         """
@@ -750,7 +810,7 @@ class QuaternionTensor(torch.Tensor):
         else:
             return self.shape
 
-    def clone(self): 
+    def clone(self):
         """
         General Pytorch cloning.
         """
@@ -766,26 +826,26 @@ class QuaternionTensor(torch.Tensor):
         new_obj.device = device
         new_obj.requires_grad = tempTensor.requires_grad
 
-        return new_obj 
-            
+        return new_obj
+
     def chunk(self):
         return self.a, self.b, self.c, self.d
-    
+
     def __add__(self, other):
         return torch.add(self, other)
-    
+
     def __radd__(self, other):
         return self.__add__(other)
 
     def __iadd_(self, other):
         return self.__class__(self + other)
-    
+
     def __sub__(self, other):
         return torch.add(self, -other)
 
     def __rsub__(self, other):
         return -self.__add__(-other)
-    
+
     def __isub__(self, other):
         return self.__class__(self - other)
 
@@ -797,7 +857,7 @@ class QuaternionTensor(torch.Tensor):
         if isinstance(other, torch.Tensor):
             if other.dim() > 1 and self.dim() > 1:
                 if other.shape[1] * 4 == self.shape[1]:
-                    out = torch.cat([other]*4, 1) * self.q
+                    out = torch.cat([other] * 4, 1) * self.q
                 else:
                     out = other * self.q
             else:
@@ -812,10 +872,10 @@ class QuaternionTensor(torch.Tensor):
 
     def __imul__(self, other):
         return self.__class__(self * other)
-    
+
     def __matmul__(self, other):
         return torch.matmul(self, other)
-    
+
     def __rmatmul__(self, other):
         return self.__matmul__(other)
 
@@ -823,29 +883,29 @@ class QuaternionTensor(torch.Tensor):
         return torch.div(self, other)
 
     def __rtruediv__(self, other):
-            
+
         if isinstance(other, torch.Tensor):
-            if other.dim() > 1 and self.dim() > 1: 
+            if other.dim() > 1 and self.dim() > 1:
                 if other.shape[1] * 4 == self.shape[1]:
-                    out = torch.cat([other]*4, 1) / self.q
+                    out = torch.cat([other] * 4, 1) / self.q
                 else:
                     out = other / self.q
             else:
                 if other.dim() == 1 and other.shape[0] == self.shape[0]:
-                    out = torch.stack([other]*self.shape[1], 1) / self.q
+                    out = torch.stack([other] * self.shape[1], 1) / self.q
                 else:
                     out = other / self.q
         else:
             out = other / self.q
 
         return self.__class__(out)
-    
+
     def __itruediv__(self, other):
         return self.__class__(self / other)
-    
+
     def __pow__(self, n):
         return torch.pow(self, n)
-    
+
     def __len__(self):
         return len(self.q)
 
@@ -853,7 +913,7 @@ class QuaternionTensor(torch.Tensor):
         return self.__repr__()
 
     def __repr__(self):
-        return f"real part: {self.a}\n" +\
-               f"imaginary part (i): {self.b}\n" +\
-               f"imaginary part (j): {self.c}\n" +\
+        return f"real part: {self.a}\n" + \
+               f"imaginary part (i): {self.b}\n" + \
+               f"imaginary part (j): {self.c}\n" + \
                f"imaginary part (k): {self.d}"

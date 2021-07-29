@@ -37,7 +37,8 @@ class MADGRAD(torch.optim.Optimizer):
     """
 
     def __init__(
-        self, params: _params_t, lr: float = 1e-2, momentum: float = 0.9, weight_decay: float = 0, eps: float = 1e-6,
+            self, params: _params_t, lr: float = 1e-2, momentum: float = 0.9, weight_decay: float = 0,
+            eps: float = 1e-6,
     ):
         if momentum < 0 or momentum >= 1:
             raise ValueError(f"Momentum {momentum} must be in the range [0,1]")
@@ -159,7 +160,6 @@ class MADGRAD(torch.optim.Optimizer):
 
                         # p is a moving average of z
                         p.data.mul_(1 - ck).add_(z, alpha=ck)
-
 
         self.state['k'] += 1
         return loss

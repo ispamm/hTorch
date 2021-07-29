@@ -21,6 +21,7 @@ ALPHA_AUX = config.getfloat("psp", "alpha_aux")
 LAYERS = config.getint("psp", "layers")
 DROPOUT = config.getfloat("psp", "dropout")
 
+
 def set_ops(quaternion):
     global conv, act, factor
     conv = QConv2d if quaternion else nn.Conv2d

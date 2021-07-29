@@ -48,6 +48,7 @@ act = nn.GELU
 lin = nn.Linear
 factor = 1
 
+
 def set_ops(quaternion):
     global lin, conv_transp, act, factor
     conv_transp = QConvTranspose2d if quaternion else nn.ConvTranspose2d

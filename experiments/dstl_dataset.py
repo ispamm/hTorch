@@ -5,10 +5,11 @@ import tifffile as tiff
 from shapely.wkt import loads as wkt_loads
 from shapely.geometry import MultiPolygon, Polygon
 import cv2
-import random 
+import random
 
 # constants
 import configparser
+
 config = configparser.SafeConfigParser()
 config.read("hTorch/experiments/constants.cfg")
 BATCH_SIZE = config.getint("dataset", "batch_size")
@@ -21,13 +22,13 @@ HEIGHT = config.getint("dataset", "height")
 DATA_SIZE_TRAIN = config.getint("dataset", "data_size_train")
 DATA_SIZE_VAL = config.getint("dataset", "data_size_val")
 
-
 file_names = pd.read_csv("train_wkt_v4.csv").ImageId.unique()
 
-file_names_train = file_names[:round(len(file_names)*TRAIN_SPLIT)]
-file_names_val_test = file_names[round(len(file_names)*TRAIN_SPLIT):]
-file_names_val = file_names_val_test[:round(len(file_names_val_test)*TEST_SPLIT)]
-file_names_test = file_names_val_test[round(len(file_names_val_test)*TEST_SPLIT):]
+file_names_train = file_names[:round(len(file_names) * TRAIN_SPLIT)]
+file_names_val_test = file_names[round(len(file_names) * TRAIN_SPLIT):]
+file_names_val = file_names_val_test[:round(len(file_names_val_test) * TEST_SPLIT)]
+file_names_test = file_names_val_test[round(len(file_names_val_test) * TEST_SPLIT):]
+
 
 class DSTLDataset(torch.utils.data.Dataset):
 
@@ -107,7 +108,6 @@ class DSTLDataset(torch.utils.data.Dataset):
         return x, y
 
 
-
 def RandomCrop(img, mask, size=(WIDTH, HEIGHT)):
     width, height = size
     x = random.randint(0, img.shape[-1] - width)
@@ -138,15 +138,15 @@ transform = [
     RandomHorizontalFlip
 ]
 
-def get_loader(phase, bs):
 
+def get_loader(phase, bs):
     file_names = eval("file_names_" + phase)
     if phase == "train":
         file_names = np.repeat(file_names_train, REPETITIONS)
         random.shuffle(file_names)
-    
+
     data = DSTLDataset(file_names, transform=transform)
     loader = torch.utils.data.DataLoader(data, batch_size=bs, shuffle=SHUFFLE, pin_memory=True,
-                                        num_workers=0, drop_last=True)
+                                         num_workers=0, drop_last=True)
 
     return loader
