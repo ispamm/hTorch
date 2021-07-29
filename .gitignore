@@ -7,3 +7,4 @@ htorch_giorgiozannini.egg-info/*
 README.md
 htmlcov/*
 */data/*
+.idea/*
