@@ -8,8 +8,6 @@ import torch
 import torch.nn as nn
 
 from madgrad import MADGRAD
-from loss import FocalTverskyLoss
-from utils import f1_score
 from crf import dense_crf_wrapper
 
 # constants

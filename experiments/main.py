@@ -17,9 +17,7 @@ sys.path.append('pytorch-image-models/')
 
 from dstl_dataset import get_loader
 from madgrad import MADGRAD
-from loss import FocalTverskyLoss
-from utils import f1_score, jaccard_score, to_rgb
-from crf import dense_crf_wrapper
+from crf import dense_crf_wrapper, to_rgb
 
 parser = argparse.ArgumentParser(description='htorch training and testing')
 parser.add_argument('-m', '--model', help='model to train, choose from: {psp, swin, unet}', required=True)
@@ -47,13 +45,6 @@ IoU = IoU(num_classes=10)
 F1 = F1(num_classes=10, mdmc_average="global")
 criterion =  TverskyLoss(alpha=0.5, beta=0.5)
 
-def to_rgb(input):s
-    img = np.zeros(tuple([input.shape[1]]) + tuple([input.shape[2]]) + tuple([3]))
-    img[:, :, 0] = input[4]
-    img[:, :, 1] = input[2]
-    img[:, :, 2] = input[1]
-
-    return (img * 255).astype(np.uint8)
 
 # define file name with configs for saving the model
 def get_short_name(name):

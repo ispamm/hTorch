@@ -2,8 +2,6 @@ import pydensecrf.densecrf as dcrf
 import pydensecrf.utils as utils
 import numpy as np
 
-from utils import to_rgb
-
 # constants
 import configparser
 
@@ -16,6 +14,13 @@ BI_XY_STD = config.getint("crf", "bi_xy_std")
 BI_RGB_STD = config.getint("crf", "bi_rgb_std")
 BI_W = config.getint("crf", "bi_w")
 
+def to_rgb(input):
+    img = np.zeros(tuple([input.shape[1]]) + tuple([input.shape[2]]) + tuple([3]))
+    img[:, :, 0] = input[4]
+    img[:, :, 1] = input[2]
+    img[:, :, 2] = input[1]
+
+    return (img * 255).astype(np.uint8)
 
 def dense_crf(img, output_probs):
     c = output_probs.shape[0]

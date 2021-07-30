@@ -7,8 +7,6 @@ import numpy as np
 
 from madgrad import MADGRAD
 from .qresnet import resnet50, resnet101, resnet152
-from loss import FocalTverskyLoss
-from utils import f1_score
 from crf import dense_crf_wrapper
 
 # constants
