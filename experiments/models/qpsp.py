@@ -55,8 +55,7 @@ class PPM(torch.nn.Module):
 
 class PSPNet(nn.Module):
     def __init__(self, quaternion=True, layers=LAYERS, bins=(1, 2, 3, 6), dropout=DROPOUT, classes=10, zoom_factor=8,
-                 use_ppm=True,
-                 pretrained=False, training=True):
+                 use_ppm=True, pretrained=False, training=True, loss=None):
         super(PSPNet, self).__init__()
         assert layers in [50, 101, 152]
         assert 2048 % len(bins) == 0
@@ -64,7 +63,7 @@ class PSPNet(nn.Module):
         assert zoom_factor in [1, 2, 4, 8]
         self.zoom_factor = zoom_factor
         self.use_ppm = use_ppm
-        self.focal_tversky_loss = FocalTverskyLoss()
+        self.loss = loss
 
         set_ops(quaternion)
         self.act = act
@@ -136,8 +135,8 @@ class PSPNet(nn.Module):
             aux = self.aux(x_tmp)
             if self.zoom_factor != 1:
                 aux = F.interpolate(aux, size=(h, w), mode='bilinear', align_corners=True)
-            main_loss = self.focal_tversky_loss(x, y)
-            aux_loss = self.focal_tversky_loss(aux, y)
+            main_loss = self.loss(x, y.argmax(1))
+            aux_loss = self.loss(aux, y.argmax(1))
             return x, main_loss, aux_loss
         else:
             return x

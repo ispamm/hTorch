@@ -9,6 +9,8 @@ import numpy as np
 from tqdm import tqdm
 import re
 import matplotlib.pyplot as plt
+from torchmetrics import IoU, F1
+from torchgeometry.losses import TverskyLoss
 
 sys.path.append('hTorch/')
 sys.path.append('pytorch-image-models/')
@@ -41,6 +43,17 @@ LEARNING_RATE = config.getfloat("training", "learning_rate")
 
 ALPHA_AUX = config.getfloat("training", "num_epochs")
 
+IoU = IoU(num_classes=10)
+F1 = F1(num_classes=10, mdmc_average="global")
+criterion =  TverskyLoss(alpha=0.5, beta=0.5)
+
+def to_rgb(input):s
+    img = np.zeros(tuple([input.shape[1]]) + tuple([input.shape[2]]) + tuple([3]))
+    img[:, :, 0] = input[4]
+    img[:, :, 1] = input[2]
+    img[:, :, 2] = input[1]
+
+    return (img * 255).astype(np.uint8)
 
 # define file name with configs for saving the model
 def get_short_name(name):
@@ -57,7 +70,7 @@ def main():
     device = "cuda"
     if args.model == "psp":
         from models.qpsp import PSPNet
-        model = PSPNet(quaternion=args.quaternion).to(device)
+        model = PSPNet(quaternion=args.quaternion, loss=criterion).to(device)
     if args.model == "swin":
         from models.qswin import SwinTransformer
         model = SwinTransformer(quaternion=args.quaternion).to(device)
@@ -97,7 +110,6 @@ def main():
             optimizer.load_state_dict(torch.load(args.checkpoint_optim_path))
 
         lr_scheduler = ReduceLROnPlateau(optimizer, 'min')
-        criterion = FocalTverskyLoss()
 
         dset_loaders = {"train": train_loader, "val": val_loader}
         dset_sizes = {"train": DATA_SIZE_TRAIN // BATCH_SIZE, "val": DATA_SIZE_VAL // BATCH_SIZE}
@@ -133,14 +145,16 @@ def main():
                             loss = main_loss + ALPHA_AUX * aux_loss
                         else:
                             outputs = model(inputs)
-                            loss = criterion(outputs, labels)
+                            loss = criterion(outputs, labels.argmax(1))
 
                     else:
                         with torch.no_grad():
                             if args.model == "psp":
                                 outputs = model(inputs, labels)
+                                loss = criterion(outputs, labels.argmax(1))
                             else:
                                 outputs = model(inputs)
+                                loss = criterion(outputs, labels.argmax(1))
 
                     # statistics
                     running_loss += loss.detach().item()
@@ -153,10 +167,9 @@ def main():
 
                     for i in range(10):
                         crf[:, i, ...] = (crf[:, i, ...] > trs[i])
-
-                    iou = jaccard_score(labels.detach().cpu(), preds)
-                    f1 = f1_score(outputs, labels)
-                    f1_crf = f1_score(labels.detach().cpu(), torch.from_numpy(crf).contiguous())
+                    iou = IoU(preds.argmax(0), labels.argmax(0).detach().cpu())
+                    f1 = F1(preds.argmax(0), labels.argmax(0).detach().cpu())
+                    f1_crf = F1(torch.from_numpy(crf).contiguous().argmax(0), labels.argmax(0).detach().cpu())
 
                     running_metric_iou += iou.detach().item()
                     running_metric_f1 += f1.detach().item()
@@ -175,8 +188,7 @@ def main():
                 epoch_f1_crf = running_metric_f1_crf / total
 
                 print('{} Loss: {:.4f} IoU: {:.4f} F1: {:.4f} F1 crf: {:.4f}'.format(
-                    phase, epoch_loss, epoch_iou,
-                    epoch_f1, epoch_f1_crf))
+                    phase, epoch_loss, epoch_iou, epoch_f1, epoch_f1_crf))
 
                 with open(os.path.join(args.save_dir, f"log_{phase[:2]}_loss_" + config_short_name + ".txt"), "a") as f:
                     f.write("%s\n" % epoch_loss)
@@ -216,8 +228,10 @@ def main():
             with torch.no_grad():
                 if args.model == "psp":
                     outputs = model(inputs, labels)
+                    loss = criterion(outputs, labels.argmax(1))
                 else:
                     outputs = model(inputs)
+                    loss = criterion(outputs, labels.argmax(1))
 
             preds = torch.sigmoid(outputs).detach().cpu()
             for i in range(10):
@@ -229,9 +243,9 @@ def main():
             for i in range(10):
                 crf[:, i, ...] = (crf[:, i, ...] > trs[i])
 
-            iou = jaccard_score(labels.detach().cpu(), preds)
-            f1 = f1_score(outputs, labels)
-            f1_crf = f1_score(labels.detach().cpu(), torch.from_numpy(crf).contiguous())
+            iou = IoU(preds.argmax(0), labels.argmax(0).detach().cpu())
+            f1 = F1(preds.argmax(0), labels.argmax(0).detach().cpu())
+            f1_crf = F1(torch.from_numpy(crf).contiguous().argmax(0), labels.argmax(0).detach().cpu())
 
             test_metric_iou += iou.detach().item()
             test_metric_f1 += f1.detach().item()
@@ -244,8 +258,7 @@ def main():
         test_f1_crf = test_metric_f1_crf / total
 
         print('Test IoU: {:.4f} F1: {:.4f} F1 crf: {:.4f}'.format(
-            test_iou,
-            test_f1, test_f1_crf))
+            test_iou, test_f1, test_f1_crf))
 
         with open(os.path.join(args.save_dir, "log_te_iou_" + config_short_name + ".txt"), "a") as f:
             f.write("%s\n" % test_iou)

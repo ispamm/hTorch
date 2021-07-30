@@ -7,4 +7,6 @@ torch
 scipy==1.6.1
 torchvision
 torchtext
+torchgeometry
+torchmetrics
 configparser
