@@ -191,7 +191,6 @@ def main():
                           "a") as f:
                     f.write("%s\n" % epoch_f1_crf)
 
-            print(resume)
             if args.save_last and epoch+resume != 0:
                 os.remove(glob.glob(os.path.join(args.save_dir, f"weight_e_{epoch+resume-1}*"))[0])
                 os.remove(glob.glob(os.path.join(args.save_dir, f"optim_e_{epoch+resume-1}*"))[0])
