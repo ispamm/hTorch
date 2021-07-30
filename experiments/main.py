@@ -3,9 +3,11 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 import argparse
 import configparser
 import os
+import glob
 import sys
 import numpy as np
 from tqdm import tqdm
+import re
 import matplotlib.pyplot as plt
 
 sys.path.append('hTorch/')
@@ -63,8 +65,10 @@ def main():
         from models.qunet import UNet
         model = UNet(quaternion=args.quaternion).to(device)
 
+    resume = 0
     if args.checkpoint_weight_path:
         model.load_state_dict(torch.load(args.checkpoint_weight_path))
+        resume = int(re.findall("(?<=e_)\d+", args.checkpoint_weight_path)[0])+1
 
     config_short_name = ""
     for section in config:
@@ -79,6 +83,8 @@ def main():
 
             config_short_name += field
     config_short_name += get_short_name(model.__class__.__name__)
+    if args.quaternion:
+        config_short_name += "_q"
     print(">" * 10, " parameters ", "<" * 10, "\n", config_short_name, sep="")
 
     # class empirical sigmoid thresholds
@@ -185,12 +191,13 @@ def main():
                           "a") as f:
                     f.write("%s\n" % epoch_f1_crf)
 
-            if args.save_last and epoch != 0:
-                os.remove(os.path.join(args.save_dir, f"weight_e_{epoch - 1}_" + config_short_name))
-                os.remove(os.path.join(args.save_dir, f"optim_e_{epoch - 1}_" + config_short_name))
+            print(resume)
+            if args.save_last and epoch+resume != 0:
+                os.remove(glob.glob(os.path.join(args.save_dir, f"weight_e_{epoch+resume-1}*"))[0])
+                os.remove(glob.glob(os.path.join(args.save_dir, f"optim_e_{epoch+resume-1}*"))[0])
 
-            torch.save(model.state_dict(), os.path.join(args.save_dir, f"weight_e_{epoch}_" + config_short_name))
-            torch.save(optimizer.state_dict(), os.path.join(args.save_dir, f"optim_e_{epoch}_" + config_short_name))
+            torch.save(model.state_dict(), os.path.join(args.save_dir, f"weight_e_{epoch+resume}_" + config_short_name))
+            torch.save(optimizer.state_dict(), os.path.join(args.save_dir, f"optim_e_{epoch+resume}_" + config_short_name))
 
             print()
 
