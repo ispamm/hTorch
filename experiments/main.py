@@ -17,7 +17,6 @@ sys.path.append('pytorch-image-models/')
 
 from dstl_dataset import get_loader
 from madgrad import MADGRAD
-from crf import dense_crf_wrapper, to_rgb
 
 parser = argparse.ArgumentParser(description='htorch training and testing')
 parser.add_argument('-m', '--model', help='model to train, choose from: {psp, swin, unet}', required=True)
@@ -45,7 +44,6 @@ LEARNING_RATE = config.getfloat("training", "learning_rate")
 ALPHA_AUX = config.getfloat("training", "num_epochs")
 
 IoU = IoU(num_classes=10)
-F1 = F1(num_classes=10, mdmc_average="global")
 criterion =  TverskyLoss(alpha=0.5, beta=0.5)
 
 
@@ -121,8 +119,6 @@ def main():
 
                 running_loss = 0.0
                 running_metric_iou = 0.0
-                running_metric_f1 = 0.0
-                running_metric_f1_crf = 0.0
                 total = 0
                 # Iterate over data.
                 for data in tqdm(dset_loaders[phase]):
@@ -156,31 +152,20 @@ def main():
                     for i in range(10):
                         preds[:, i, ...] = (preds[:, i, ...] > trs[i])
 
-                    probs = torch.sigmoid(preds).data.cpu().numpy()
-                    crf = np.stack(list(map(dense_crf_wrapper, zip(inputs.cpu().numpy(), probs))))
-
-                    for i in range(10):
-                        crf[:, i, ...] = (crf[:, i, ...] > trs[i])
                     iou = IoU(preds.argmax(0), labels.argmax(0).detach().cpu())
-                    f1 = F1(preds.argmax(0), labels.argmax(0).detach().cpu())
-                    f1_crf = F1(torch.from_numpy(crf).contiguous().argmax(0), labels.argmax(0).detach().cpu())
-
                     running_metric_iou += iou.detach().item()
-                    running_metric_f1 += f1.detach().item()
-                    running_metric_f1_crf += f1_crf.detach().item()
 
                     total += labels.size(0)
 
                     if phase == 'train':
                         loss.backward()
                         optimizer.step()
-                        lr_scheduler.step(f1)
+                    if phase == 'val':
+                        lr_scheduler.step(loss)
 
                 epoch_loss = running_loss / total
                 epoch_iou = running_metric_iou / total
-                epoch_f1 = running_metric_f1 / total
-                epoch_f1_crf = running_metric_f1_crf / total
-
+                
                 print('{} Loss: {:.4f} IoU: {:.4f} F1: {:.4f} F1 crf: {:.4f}'.format(
                     phase, epoch_loss, epoch_iou, epoch_f1, epoch_f1_crf))
 
@@ -189,13 +174,6 @@ def main():
 
                 with open(os.path.join(args.save_dir, f"log_{phase[:2]}_iou_" + config_short_name + ".txt"), "a") as f:
                     f.write("%s\n" % epoch_iou)
-
-                with open(os.path.join(args.save_dir, f"log_{phase[:2]}_f1_" + config_short_name + ".txt"), "a") as f:
-                    f.write("%s\n" % epoch_f1)
-
-                with open(os.path.join(args.save_dir, f"log_{phase[:2]}_f1crf_" + config_short_name + ".txt"),
-                          "a") as f:
-                    f.write("%s\n" % epoch_f1_crf)
 
             if args.save_last and epoch+resume != 0:
                 os.remove(glob.glob(os.path.join(args.save_dir, f"weight_e_{epoch+resume-1}*"))[0])
@@ -231,25 +209,12 @@ def main():
             for i in range(10):
                 preds[:, i, ...] = (preds[:, i, ...] > trs[i])
 
-            probs = torch.sigmoid(preds).data.cpu().numpy()
-            crf = np.stack(list(map(dense_crf_wrapper, zip(inputs.cpu().numpy(), probs))))
-
-            for i in range(10):
-                crf[:, i, ...] = (crf[:, i, ...] > trs[i])
-
             iou = IoU(preds.argmax(0), labels.argmax(0).detach().cpu())
-            f1 = F1(preds.argmax(0), labels.argmax(0).detach().cpu())
-            f1_crf = F1(torch.from_numpy(crf).contiguous().argmax(0), labels.argmax(0).detach().cpu())
-
             test_metric_iou += iou.detach().item()
-            test_metric_f1 += f1.detach().item()
-            test_metric_f1_crf += f1_crf.detach().item()
 
             total += labels.size(0)
 
         test_iou = test_metric_iou / total
-        test_f1 = test_metric_f1 / total
-        test_f1_crf = test_metric_f1_crf / total
 
         print('Test IoU: {:.4f} F1: {:.4f} F1 crf: {:.4f}'.format(
             test_iou, test_f1, test_f1_crf))
@@ -257,17 +222,16 @@ def main():
         with open(os.path.join(args.save_dir, "log_te_iou_" + config_short_name + ".txt"), "a") as f:
             f.write("%s\n" % test_iou)
 
-        with open(os.path.join(args.save_dir, "log_te_f1_" + config_short_name + ".txt"), "a") as f:
-            f.write("%s\n" % test_f1)
-
-        with open(os.path.join(args.save_dir, "log_te_f1crf_" + config_short_name + ".txt"), "a") as f:
-            f.write("%s\n" % test_f1_crf)
 
     print()
 
     plt.figure(figsize=[10, 10])
-    plt.imshow(to_rgb(outputs[0].detach().cpu().numpy()))
+    plt.imshow(preds[0][3].detach().cpu().numpy())
     plt.savefig("test.jpg")
+
+    plt.figure(figsize=[10, 10])
+    plt.imshow(labels[0][3].detach().cpu().numpy())
+    plt.savefig("ground_truth.jpg")
 
 
 if __name__ == '__main__':
