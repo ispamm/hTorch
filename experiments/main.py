@@ -30,6 +30,14 @@ parser.add_argument('-l', '--save-last', help='save only last epoch', action='st
 
 args = parser.parse_args()
 
+if not os.path.exists(args.save_dir):
+    path = args.save_dir
+    if args.quaternion:
+        path += "_q" + args.model
+    else:
+        path += args.model
+    os.makedirs(path)
+
 config = configparser.ConfigParser()
 config.read("hTorch/experiments/constants.cfg")
 
