@@ -43,9 +43,15 @@ LEARNING_RATE = config.getfloat("training", "learning_rate")
 
 ALPHA_AUX = config.getfloat("training", "num_epochs")
 
-IoU = IoU(num_classes=10)
-criterion =  TverskyLoss(alpha=0.5, beta=0.5)
+ALPHA = config.getfloat("loss", "alpha")
+BETA = config.getfloat("loss", "beta")
+GAMMA = config.getfloat("loss", "gamma")
 
+IoU = IoU(num_classes=10)
+tversky =  TverskyLoss(alpha=ALPHA, beta=BETA)
+
+def tversky_focal(*args):
+    return tversky(*args)**GAMMA
 
 # define file name with configs for saving the model
 def get_short_name(name):
@@ -62,7 +68,7 @@ def main():
     device = "cuda"
     if args.model == "psp":
         from models.qpsp import PSPNet
-        model = PSPNet(quaternion=args.quaternion, loss=criterion).to(device)
+        model = PSPNet(quaternion=args.quaternion, loss=tversky_focal).to(device)
     if args.model == "swin":
         from models.qswin import SwinTransformer
         model = SwinTransformer(quaternion=args.quaternion).to(device)
@@ -135,16 +141,16 @@ def main():
                             loss = main_loss + ALPHA_AUX * aux_loss
                         else:
                             outputs = model(inputs)
-                            loss = criterion(outputs, labels.argmax(1))
+                            loss = tversky_focal(outputs, labels.argmax(1))
 
                     else:
                         with torch.no_grad():
                             if args.model == "psp":
                                 outputs = model(inputs, labels)
-                                loss = criterion(outputs, labels.argmax(1))
+                                loss = tversky_focal(outputs, labels.argmax(1))
                             else:
                                 outputs = model(inputs)
-                                loss = criterion(outputs, labels.argmax(1))
+                                loss = tversky_focal(outputs, labels.argmax(1))
 
                     # statistics
                     running_loss += loss.detach().item()
@@ -166,8 +172,8 @@ def main():
                 epoch_loss = running_loss / total
                 epoch_iou = running_metric_iou / total
                 
-                print('{} Loss: {:.4f} IoU: {:.4f} F1: {:.4f} F1 crf: {:.4f}'.format(
-                    phase, epoch_loss, epoch_iou, epoch_f1, epoch_f1_crf))
+                print('{} Loss: {:.4f} IoU: {:.4f}'.format(
+                    phase, epoch_loss, epoch_iou))
 
                 with open(os.path.join(args.save_dir, f"log_{phase[:2]}_loss_" + config_short_name + ".txt"), "a") as f:
                     f.write("%s\n" % epoch_loss)
@@ -200,10 +206,10 @@ def main():
             with torch.no_grad():
                 if args.model == "psp":
                     outputs = model(inputs, labels)
-                    loss = criterion(outputs, labels.argmax(1))
+                    loss = tversky_focal(outputs, labels.argmax(1))
                 else:
                     outputs = model(inputs)
-                    loss = criterion(outputs, labels.argmax(1))
+                    loss = tversky_focal(outputs, labels.argmax(1))
 
             preds = torch.sigmoid(outputs).detach().cpu()
             for i in range(10):
@@ -216,8 +222,7 @@ def main():
 
         test_iou = test_metric_iou / total
 
-        print('Test IoU: {:.4f} F1: {:.4f} F1 crf: {:.4f}'.format(
-            test_iou, test_f1, test_f1_crf))
+        print('Test IoU: {:.4f}'.format(test_iou))
 
         with open(os.path.join(args.save_dir, "log_te_iou_" + config_short_name + ".txt"), "a") as f:
             f.write("%s\n" % test_iou)
