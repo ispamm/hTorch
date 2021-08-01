@@ -39,21 +39,21 @@ class UNet(nn.Module):
         super().__init__()
 
         set_ops(quaternion)
+        channels = 128
+        self.dconv_down1 = double_conv(8 // factor, channels // factor)
 
-        self.dconv_down1 = double_conv(8 // factor, 64 // factor)
-
-        self.dconv_down2 = double_conv(64 // factor, 128 // factor)
-        self.dconv_down3 = double_conv(128 // factor, 256 // factor)
-        self.dconv_down4 = double_conv(256 // factor, 512 // factor)
+        self.dconv_down2 = double_conv(channels // factor, channels * 2 // factor)
+        self.dconv_down3 = double_conv(channels * 2 // factor, channels * 4 // factor)
+        self.dconv_down4 = double_conv(channels * 4 // factor, channels * 8 // factor)
 
         self.maxpool = nn.MaxPool2d(2)
         self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
 
-        self.dconv_up3 = double_conv((256 + 512) // factor, 256 // factor)
-        self.dconv_up2 = double_conv((128 + 256) // factor, 128 // factor)
-        self.dconv_up1 = double_conv((128 + 64) // factor, 64 // factor)
+        self.dconv_up3 = double_conv((channels * 4 + channels * 8) // factor, channels * 4 // factor)
+        self.dconv_up2 = double_conv((channels * 2 + channels * 4) // factor, channels * 2 // factor)
+        self.dconv_up1 = double_conv((channels * 2 + channels) // factor, channels // factor)
 
-        self.conv_last = nn.Conv2d(64, n_class, 1)
+        self.conv_last = nn.Conv2d(channels, n_class, 1)
 
     def forward(self, x):
         conv1 = self.dconv_down1(x)

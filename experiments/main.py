@@ -29,6 +29,23 @@ parser.add_argument('-l', '--save-last', help='save only last epoch', action='st
 
 args = parser.parse_args()
 
+def plot_fig(input, name):
+    
+    plt.figure(figsize=[5, 5])
+    fig, axes = plt.subplots(2,5)
+    axes[0][0].imshow(input[0])
+    axes[0][1].imshow(input[1])
+    axes[0][2].imshow(input[2])
+    axes[0][3].imshow(input[3])
+    axes[0][4].imshow(input[4])
+
+    axes[1][0].imshow(input[5])
+    axes[1][1].imshow(input[6])
+    axes[1][2].imshow(input[7])
+    axes[1][3].imshow(input[8])
+    axes[1][4].imshow(input[9])
+    plt.savefig(name + ".jpg")
+
 if not os.path.exists(args.save_dir):
     os.makedirs(args.save_dir)
 
@@ -234,13 +251,9 @@ def main():
 
     print()
 
-    plt.figure(figsize=[10, 10])
-    plt.imshow(preds[0][3].detach().cpu().numpy())
-    plt.savefig("test.jpg")
+    plot_fig(preds[0], "test")
+    plot_fig(labels[0].detach().cpu().numpy(), "ground_truth")
 
-    plt.figure(figsize=[10, 10])
-    plt.imshow(labels[0][3].detach().cpu().numpy())
-    plt.savefig("ground_truth.jpg")
 
 
 if __name__ == '__main__':
