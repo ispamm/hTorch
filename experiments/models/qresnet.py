@@ -30,12 +30,12 @@ class ChannelBlock(nn.Module):
 
         self.act = act
 
-        self.bn1 = nn.BatchNorm2d(inplanes * 4)
-        self.conv1 = conv(inplanes // factor, planes // factor, kernel_size=1, stride=stride,
+        self.bn1 = nn.BatchNorm2d(inplanes * factor)
+        self.conv1 = conv(inplanes, planes, kernel_size=1, stride=stride,
                           padding=0, bias=False)
 
-        self.bn2 = nn.BatchNorm2d(planes * 4)
-        self.conv2 = conv(planes // factor, planes // factor, kernel_size=1, stride=stride,
+        self.bn2 = nn.BatchNorm2d(planes * factor)
+        self.conv2 = conv(planes, planes, kernel_size=1, stride=stride,
                           padding=0, bias=False)
 
         self.stride = stride

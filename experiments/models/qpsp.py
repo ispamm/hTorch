@@ -96,7 +96,6 @@ class PSPNet(nn.Module):
             conv(fea_dim, 512 // factor, kernel_size=5, padding=1, bias=False),
             nn.BatchNorm2d(512),
             self.act(),
-
             nn.Dropout2d(p=dropout),
             nn.Conv2d(512, classes, kernel_size=1)
         )
@@ -128,8 +127,8 @@ class PSPNet(nn.Module):
         x = self.cls(x)
         if self.zoom_factor != 1:
             x = F.interpolate(x, size=(h, w), mode='bilinear', align_corners=True)
+        
         if self.training:
-
             aux = self.aux(x_tmp)
             if self.zoom_factor != 1:
                 aux = F.interpolate(aux, size=(h, w), mode='bilinear', align_corners=True)

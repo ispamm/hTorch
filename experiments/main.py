@@ -47,7 +47,7 @@ ALPHA = config.getfloat("loss", "alpha")
 BETA = config.getfloat("loss", "beta")
 GAMMA = config.getfloat("loss", "gamma")
 
-IoU = IoU(num_classes=10)
+IoU = IoU(num_classes=2)
 tversky =  TverskyLoss(alpha=ALPHA, beta=BETA)
 
 def tversky_focal(*args):
@@ -130,6 +130,8 @@ def main():
                 for data in tqdm(dset_loaders[phase]):
                     # get the inputs
                     inputs, labels = data
+                    
+                    # inputs = 2*inputs -1
                     inputs, labels = inputs.to(device), labels.to(device)
                     # zero the parameter gradients
                     optimizer.zero_grad()
@@ -153,12 +155,11 @@ def main():
                                 loss = tversky_focal(outputs, labels.argmax(1))
 
                     # statistics
-                    running_loss += loss.detach().item()
                     preds = torch.sigmoid(outputs).detach().cpu()
                     for i in range(10):
                         preds[:, i, ...] = (preds[:, i, ...] > trs[i])
 
-                    iou = IoU(preds.argmax(0), labels.argmax(0).detach().cpu())
+                    iou = IoU(preds, labels.detach().cpu())
                     running_metric_iou += iou.detach().item()
 
                     total += labels.size(0)
@@ -168,6 +169,9 @@ def main():
                         optimizer.step()
                     if phase == 'val':
                         lr_scheduler.step(loss)
+                    
+                    running_loss += loss.detach().item()
+
 
                 epoch_loss = running_loss / total
                 epoch_iou = running_metric_iou / total
@@ -212,10 +216,10 @@ def main():
                     loss = tversky_focal(outputs, labels.argmax(1))
 
             preds = torch.sigmoid(outputs).detach().cpu()
-            for i in range(10):
-                preds[:, i, ...] = (preds[:, i, ...] > trs[i])
+            # for i in range(10):
+            #     preds[:, i, ...] = (preds[:, i, ...] > trs[i])
 
-            iou = IoU(preds.argmax(0), labels.argmax(0).detach().cpu())
+            iou = IoU(preds, labels.detach().cpu())
             test_metric_iou += iou.detach().item()
 
             total += labels.size(0)
