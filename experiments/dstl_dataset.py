@@ -105,6 +105,8 @@ class DSTLDataset(torch.utils.data.Dataset):
             else:
                 index = 0
 
+        min = x.min()
+        x = (x - min)/(x.max() - min)
         return x, y
 
 

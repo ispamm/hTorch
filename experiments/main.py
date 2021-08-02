@@ -33,17 +33,17 @@ def plot_fig(input, name):
     
     plt.figure(figsize=[5, 5])
     fig, axes = plt.subplots(2,5)
-    axes[0][0].imshow(input[0])
-    axes[0][1].imshow(input[1])
-    axes[0][2].imshow(input[2])
-    axes[0][3].imshow(input[3])
-    axes[0][4].imshow(input[4])
+    axes[0][0].imshow(input[0], cmap="gray")
+    axes[0][1].imshow(input[1], cmap="gray")
+    axes[0][2].imshow(input[2], cmap="gray")
+    axes[0][3].imshow(input[3], cmap="gray")
+    axes[0][4].imshow(input[4], cmap="gray")
 
-    axes[1][0].imshow(input[5])
-    axes[1][1].imshow(input[6])
-    axes[1][2].imshow(input[7])
-    axes[1][3].imshow(input[8])
-    axes[1][4].imshow(input[9])
+    axes[1][0].imshow(input[5], cmap="gray")
+    axes[1][1].imshow(input[6], cmap="gray")
+    axes[1][2].imshow(input[7], cmap="gray")
+    axes[1][3].imshow(input[8], cmap="gray")
+    axes[1][4].imshow(input[9], cmap="gray")
     plt.savefig(name + ".jpg")
 
 if not os.path.exists(args.save_dir):
@@ -172,7 +172,7 @@ def main():
                                 loss = tversky_focal(outputs, labels.argmax(1))
 
                     # statistics
-                    preds = torch.sigmoid(outputs).detach().cpu()
+                    preds = torch.softmax(outputs, 1).detach().cpu()
                     for i in range(10):
                         preds[:, i, ...] = (preds[:, i, ...] > trs[i])
 
@@ -208,6 +208,10 @@ def main():
 
             torch.save(model.state_dict(), os.path.join(args.save_dir, f"weight_e_{epoch+resume}_" + config_short_name))
             torch.save(optimizer.state_dict(), os.path.join(args.save_dir, f"optim_e_{epoch+resume}_" + config_short_name))
+            
+            if phase == "val":
+                plot_fig(preds[0].detach().cpu().numpy(), f"pred_epoch{epoch}")
+                plot_fig(labels[0].detach().cpu().numpy(), f"groundtruth_epoch{epoch}")
 
             print()
 
@@ -232,9 +236,9 @@ def main():
                     outputs = model(inputs)
                     loss = tversky_focal(outputs, labels.argmax(1))
 
-            preds = torch.sigmoid(outputs).detach().cpu()
-            # for i in range(10):
-            #     preds[:, i, ...] = (preds[:, i, ...] > trs[i])
+            preds = torch.softmax(outputs, 1).detach().cpu()
+            for i in range(10):
+                preds[:, i, ...] = (preds[:, i, ...] > trs[i])
 
             iou = IoU(preds, labels.detach().cpu())
             test_metric_iou += iou.detach().item()
@@ -248,12 +252,13 @@ def main():
         with open(os.path.join(args.save_dir, "log_te_iou_" + config_short_name + ".txt"), "a") as f:
             f.write("%s\n" % test_iou)
 
+        plot_fig(preds[0].detach().cpu().numpy(), f"pred_test")
+        plot_fig(labels[0].detach().cpu().numpy(), "groundtruth_test")
 
     print()
 
-    plot_fig(preds[0], "test")
-    plot_fig(labels[0].detach().cpu().numpy(), "ground_truth")
-
+    inputs, labels = next(iter(test_loader))
+    outputs = model(inputs.to(device))
 
 
 if __name__ == '__main__':
