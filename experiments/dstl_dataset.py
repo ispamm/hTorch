@@ -7,6 +7,8 @@ from shapely.geometry import MultiPolygon, Polygon
 import cv2
 import random
 
+from kaggle_funcs import stick_all_train
+
 # constants
 import configparser
 

@@ -15,8 +15,8 @@ from torchgeometry.losses import TverskyLoss
 sys.path.append('hTorch/')
 sys.path.append('pytorch-image-models/')
 
-from dstl_dataset import get_loader
 from madgrad import MADGRAD
+from kaggle_funcs import stick_all_train, get_patches
 
 parser = argparse.ArgumentParser(description='htorch training and testing')
 parser.add_argument('-m', '--model', help='model to train, choose from: {psp, swin, unet}', required=True)
@@ -55,6 +55,8 @@ config.read("hTorch/experiments/constants.cfg")
 DATA_SIZE_TRAIN = config.getint("dataset", "data_size_train")
 DATA_SIZE_VAL = config.getint("dataset", "data_size_val")
 BATCH_SIZE = config.getint("dataset", "batch_size")
+SHUFFLE = config.getboolean("dataset", "shuffle")
+
 NUM_EPOCHS = config.getint("training", "num_epochs")
 LEARNING_RATE = config.getfloat("training", "learning_rate")
 
@@ -117,14 +119,24 @@ def main():
 
     # class empirical sigmoid thresholds
     trs = [0.4, 0.1, 0.4, 0.3, 0.3, 0.5, 0.3, 0.6, 0.1, 0.1]
+    img, msk = stick_all_train()
 
     if not args.test:
-        train_loader, val_loader = get_loader("train", BATCH_SIZE), get_loader("val", 2)
         optimizer = MADGRAD(model.parameters(), lr=LEARNING_RATE)
         if args.checkpoint_optim_path:
             optimizer.load_state_dict(torch.load(args.checkpoint_optim_path))
 
         lr_scheduler = ReduceLROnPlateau(optimizer, 'min')
+        
+        x_train, y_train = get_patches(img, msk, 3000)
+        train = torch.utils.data.TensorDataset(torch.from_numpy(x_train), torch.from_numpy(y_train))
+        train_loader = torch.utils.data.DataLoader(train, batch_size=BATCH_SIZE, shuffle=SHUFFLE, pin_memory=True,
+                                         num_workers=0, drop_last=True)
+       
+        x_val, y_val = get_patches(img, msk, 1000)
+        val = torch.utils.data.TensorDataset(torch.from_numpy(x_val), torch.from_numpy(y_val))
+        val_loader = torch.utils.data.DataLoader(val, batch_size=BATCH_SIZE, shuffle=SHUFFLE, pin_memory=True,
+                                         num_workers=0, drop_last=True)
 
         dset_loaders = {"train": train_loader, "val": val_loader}
         dset_sizes = {"train": DATA_SIZE_TRAIN // BATCH_SIZE, "val": DATA_SIZE_VAL // BATCH_SIZE}
@@ -149,9 +161,8 @@ def main():
                     inputs, labels = data
                     
                     # inputs = 2*inputs -1
-                    inputs, labels = inputs.to(device), labels.to(device)
+                    inputs, labels = inputs.to(device).float(), labels.to(device).long()
                     # zero the parameter gradients
-                    optimizer.zero_grad()
 
                     # forward
                     if phase == "train":
@@ -171,6 +182,12 @@ def main():
                                 outputs = model(inputs)
                                 loss = tversky_focal(outputs, labels.argmax(1))
 
+                    total += labels.size(0)
+                    if phase == 'train':
+                        loss.backward()
+                        optimizer.step()
+                        optimizer.zero_grad()
+
                     # statistics
                     preds = torch.softmax(outputs, 1).detach().cpu()
                     for i in range(10):
@@ -179,11 +196,6 @@ def main():
                     iou = IoU(preds, labels.detach().cpu())
                     running_metric_iou += iou.detach().item()
 
-                    total += labels.size(0)
-
-                    if phase == 'train':
-                        loss.backward()
-                        optimizer.step()
                     if phase == 'val':
                         lr_scheduler.step(loss)
                     
@@ -213,11 +225,20 @@ def main():
                 plot_fig(preds[0].detach().cpu().numpy(), f"pred_epoch{epoch}")
                 plot_fig(labels[0].detach().cpu().numpy(), f"groundtruth_epoch{epoch}")
 
-            print()
+        # del x_train, y_train, train, train_loader
+        # x_train, y_train = get_patches(img, msk, 3000)
+        # train = torch.utils.data.TensorDataset(x_train, y_train)
+        # train_loader = torch.utils.data.DataLoader(train, batch_size=BATCH_SIZE, shuffle=SHUFFLE, pin_memory=True,
+        #                                 num_workers=0, drop_last=True)
+
+        print()
 
     else:
-        test_loader = get_loader("test", 2)
-        model.train(False)
+
+        x_test, y_test = get_patches(img, msk, 3000)
+        test = torch.utils.data.TensorDataset(torch.from_numpy(x_train), torch.from_numpy(y_train))
+        test_loader = torch.utils.data.DataLoader(test, batch_size=BATCH_SIZE, shuffle=SHUFFLE, pin_memory=True,
+                                         num_workers=0, drop_last=True)        model.train(False)
 
         test_metric_iou = 0.0
         test_metric_f1 = 0.0
@@ -226,7 +247,7 @@ def main():
         for data in tqdm(test_loader):
             # get the inputs
             inputs, labels = data
-            inputs, labels = inputs.to(device), labels.to(device)
+            inputs, labels = inputs.to(device).float(), labels.to(device).long()
 
             with torch.no_grad():
                 if args.model == "psp":
