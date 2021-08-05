@@ -16,6 +16,7 @@ from shapely.geometry import MultiPolygon, Polygon
 import shapely.wkt
 import shapely.affinity
 from collections import defaultdict
+import torch
 
 N_Cls = 10
 DF = pd.read_csv('train_wkt_v4.csv')
@@ -262,3 +263,29 @@ def get_scalers(im_size, x_max, y_min):
     w_ = 1.0 * w * (w / (w + 1))
     h_ = 1.0 * h * (h / (h + 1))
     return w_ / x_max, h_ / y_min
+
+
+def predict_id(id, model, trs):
+    img = M(id)
+    x = stretch_n(img)
+
+    cnv = np.zeros((960, 960, 8)).astype(np.float32)
+    prd = np.zeros((N_Cls, 960, 960)).astype(np.float32)
+    cnv[:img.shape[0], :img.shape[1], :] = x
+
+    for i in range(0, 6):
+        line = []
+        for j in range(0, 6):
+            line.append(cnv[i * ISZ:(i + 1) * ISZ, j * ISZ:(j + 1) * ISZ])
+
+        x = 2 * np.transpose(line, (0, 3, 1, 2)) - 1
+        model.train(False)
+        tmp = model(torch.from_numpy(x).float().cuda())
+        for j in range(tmp.shape[0]):
+            prd[:, i * ISZ:(i + 1) * ISZ, j * ISZ:(j + 1) * ISZ] = tmp[j].detach().cpu().numpy()
+
+    # trs = [0.4, 0.1, 0.4, 0.3, 0.3, 0.5, 0.3, 0.6, 0.1, 0.1]
+    for i in range(N_Cls):
+        prd[i] = prd[i] > trs[i]
+
+    return prd[:, :img.shape[0], :img.shape[1]]

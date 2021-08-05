@@ -16,7 +16,7 @@ sys.path.append('hTorch/')
 sys.path.append('pytorch-image-models/')
 
 from madgrad import MADGRAD
-from kaggle_funcs import stick_all_train, get_patches
+from kaggle_funcs import stick_all_train, get_patches, predict_id
 
 parser = argparse.ArgumentParser(description='htorch training and testing')
 parser.add_argument('-m', '--model', help='model to train, choose from: {psp, swin, unet}', required=True)
@@ -236,9 +236,10 @@ def main():
     else:
 
         x_test, y_test = get_patches(img, msk, 3000)
-        test = torch.utils.data.TensorDataset(torch.from_numpy(x_train), torch.from_numpy(y_train))
+        test = torch.utils.data.TensorDataset(torch.from_numpy(x_test), torch.from_numpy(y_test))
         test_loader = torch.utils.data.DataLoader(test, batch_size=BATCH_SIZE, shuffle=SHUFFLE, pin_memory=True,
-                                         num_workers=0, drop_last=True)        model.train(False)
+                                         num_workers=0, drop_last=True)        
+        model.train(False)
 
         test_metric_iou = 0.0
         test_metric_f1 = 0.0
@@ -276,11 +277,11 @@ def main():
         plot_fig(preds[0].detach().cpu().numpy(), f"pred_test")
         plot_fig(labels[0].detach().cpu().numpy(), "groundtruth_test")
 
+
+    msk = predict_id('6120_2_3', model, [0.4, 0.1, 0.4, 0.3, 0.3, 0.5, 0.3, 0.6, 0.1, 0.1])
+    plot_fig(msk, f"pred_test")
+
     print()
-
-    inputs, labels = next(iter(test_loader))
-    outputs = model(inputs.to(device))
-
 
 if __name__ == '__main__':
     main()
