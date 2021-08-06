@@ -17,6 +17,7 @@ sys.path.append('pytorch-image-models/')
 
 from madgrad import MADGRAD
 from kaggle_funcs import stick_all_train, get_patches, predict_id
+from loss import FocalTverskyLoss
 
 parser = argparse.ArgumentParser(description='htorch training and testing')
 parser.add_argument('-m', '--model', help='model to train, choose from: {psp, swin, unet}', required=True)
@@ -67,10 +68,8 @@ BETA = config.getfloat("loss", "beta")
 GAMMA = config.getfloat("loss", "gamma")
 
 IoU = IoU(num_classes=2)
-tversky =  TverskyLoss(alpha=ALPHA, beta=BETA)
+tversky_focal =  FocalTverskyLoss(alpha=ALPHA, beta=BETA, gamma=GAMMA)
 
-def tversky_focal(*args):
-    return tversky(*args)**GAMMA
 
 # define file name with configs for saving the model
 def get_short_name(name):
@@ -171,16 +170,16 @@ def main():
                             loss = main_loss + ALPHA_AUX * aux_loss
                         else:
                             outputs = model(inputs)
-                            loss = tversky_focal(outputs, labels.argmax(1))
+                            loss = tversky_focal(outputs, labels)
 
                     else:
                         with torch.no_grad():
                             if args.model == "psp":
                                 outputs = model(inputs, labels)
-                                loss = tversky_focal(outputs, labels.argmax(1))
+                                loss = tversky_focal(outputs, labels)
                             else:
                                 outputs = model(inputs)
-                                loss = tversky_focal(outputs, labels.argmax(1))
+                                loss = tversky_focal(outputs, labels)
 
                     total += labels.size(0)
                     if phase == 'train':
@@ -189,7 +188,7 @@ def main():
                         optimizer.zero_grad()
 
                     # statistics
-                    preds = torch.softmax(outputs, 1).detach().cpu()
+                    preds = torch.sigmoid(outputs).detach().cpu()
                     for i in range(10):
                         preds[:, i, ...] = (preds[:, i, ...] > trs[i])
 
@@ -225,11 +224,11 @@ def main():
                 plot_fig(preds[0].detach().cpu().numpy(), f"pred_epoch{epoch}")
                 plot_fig(labels[0].detach().cpu().numpy(), f"groundtruth_epoch{epoch}")
 
-        # del x_train, y_train, train, train_loader
-        # x_train, y_train = get_patches(img, msk, 3000)
-        # train = torch.utils.data.TensorDataset(x_train, y_train)
-        # train_loader = torch.utils.data.DataLoader(train, batch_size=BATCH_SIZE, shuffle=SHUFFLE, pin_memory=True,
-        #                                 num_workers=0, drop_last=True)
+        del x_train, y_train, train, train_loader
+        x_train, y_train = get_patches(img, msk, 3000)
+        train = torch.utils.data.TensorDataset(x_train, y_train)
+        train_loader = torch.utils.data.DataLoader(train, batch_size=BATCH_SIZE, shuffle=SHUFFLE, pin_memory=True,
+                                        num_workers=0, drop_last=True)
 
         print()
 
@@ -253,12 +252,12 @@ def main():
             with torch.no_grad():
                 if args.model == "psp":
                     outputs = model(inputs, labels)
-                    loss = tversky_focal(outputs, labels.argmax(1))
+                    loss = tversky_focal(outputs, labels)
                 else:
                     outputs = model(inputs)
-                    loss = tversky_focal(outputs, labels.argmax(1))
+                    loss = tversky_focal(outputs, labels)
 
-            preds = torch.softmax(outputs, 1).detach().cpu()
+            preds = torch.sigmoid(outputs).detach().cpu()
             for i in range(10):
                 preds[:, i, ...] = (preds[:, i, ...] > trs[i])
 
