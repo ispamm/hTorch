@@ -27,13 +27,9 @@ def set_ops(quaternion):
 
 def double_conv(in_channels, out_channels):
     return nn.Sequential(
-        conv(in_channels, out_channels, 3, padding=1),
-        nn.BatchNorm2d(out_channels * factor),
-        
+        conv(in_channels, out_channels, 3, padding=1),        
         act(),
         conv(out_channels, out_channels, 3, padding=1),
-        nn.BatchNorm2d(out_channels * factor),
-
         act()
     )
 
