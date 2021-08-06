@@ -49,7 +49,7 @@ def plot_fig(input, name):
 
 if not os.path.exists(args.save_dir):
     os.makedirs(args.save_dir)
-
+  
 config = configparser.ConfigParser()
 config.read("hTorch/experiments/constants.cfg")
 
@@ -115,6 +115,7 @@ def main():
     if args.quaternion:
         config_short_name += "_q"
     print(">" * 10, " parameters ", "<" * 10, "\n", config_short_name, sep="")
+    print("saving to: ", args.save_dir)
 
     # class empirical sigmoid thresholds
     trs = [0.4, 0.1, 0.4, 0.3, 0.3, 0.5, 0.3, 0.6, 0.1, 0.1]
