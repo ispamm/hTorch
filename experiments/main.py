@@ -126,7 +126,7 @@ def main():
         if args.checkpoint_optim_path:
             optimizer.load_state_dict(torch.load(args.checkpoint_optim_path))
 
-        lr_scheduler = ReduceLROnPlateau(optimizer, 'min')
+        lr_scheduler = ReduceLROnPlateau(optimizer, mode='min', patience=3, verbose=True)
         
         x_train, y_train = get_patches(img, msk, 3000)
         train = torch.utils.data.TensorDataset(torch.from_numpy(x_train), torch.from_numpy(y_train))
@@ -163,6 +163,7 @@ def main():
                     # inputs = 2*inputs -1
                     inputs, labels = inputs.to(device).float(), labels.to(device).long()
                     # zero the parameter gradients
+                    optimizer.zero_grad()
 
                     # forward
                     if phase == "train":
@@ -185,8 +186,8 @@ def main():
                     total += labels.size(0)
                     if phase == 'train':
                         loss.backward()
+
                         optimizer.step()
-                        optimizer.zero_grad()
 
                     # statistics
                     preds = torch.sigmoid(outputs).detach().cpu()
@@ -195,14 +196,13 @@ def main():
 
                     iou = IoU(preds, labels.detach().cpu())
                     running_metric_iou += iou.detach().item()
-
-                    if phase == 'val':
-                        lr_scheduler.step(loss)
                     
                     running_loss += loss.detach().item()
 
 
                 epoch_loss = running_loss / total
+                if phase == 'val':
+                        lr_scheduler.step(epoch_loss)
                 epoch_iou = running_metric_iou / total
                 
                 print('{} Loss: {:.4f} IoU: {:.4f}'.format(
