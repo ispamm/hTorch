@@ -219,10 +219,7 @@ def main():
 
             torch.save(model.state_dict(), os.path.join(args.save_dir, f"weight_e_{epoch+resume}_" + config_short_name))
             torch.save(optimizer.state_dict(), os.path.join(args.save_dir, f"optim_e_{epoch+resume}_" + config_short_name))
-            
-            if phase == "val":
-                plot_fig(preds[0].detach().cpu().numpy(), f"pred_epoch{epoch}")
-                plot_fig(labels[0].detach().cpu().numpy(), f"groundtruth_epoch{epoch}")
+
 
         del x_train, y_train, train, train_loader
         x_train, y_train = get_patches(img, msk, 3000)
@@ -273,12 +270,9 @@ def main():
         with open(os.path.join(args.save_dir, "log_te_iou_" + config_short_name + ".txt"), "a") as f:
             f.write("%s\n" % test_iou)
 
-        # plot_fig(preds[0].detach().cpu().numpy(), f"pred_test")
-        # plot_fig(labels[0].detach().cpu().numpy(), "groundtruth_test")
-
 
     msk = predict_id('6120_2_3', model, [0.4, 0.1, 0.4, 0.3, 0.3, 0.5, 0.3, 0.6, 0.1, 0.1])
-    plot_fig(msk, f"pred_test.jpg")
+    plot_fig(msk, os.path.join(args.save_dir, "pred_test"))
 
     print()
 
