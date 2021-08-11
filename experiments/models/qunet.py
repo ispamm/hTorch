@@ -21,15 +21,17 @@ LEARNING_RATE = config.getfloat("training", "learning_rate")
 def set_ops(quaternion):
     global conv, act, factor
     conv = QConv2d if quaternion else nn.Conv2d
-    act = QModReLU if quaternion else nn.ReLU
+    act = nn.ReLU
     factor = 4 if quaternion else 1
 
 
 def double_conv(in_channels, out_channels):
     return nn.Sequential(
         conv(in_channels, out_channels, 3, padding=1), 
+        nn.BatchNorm2d(out_channels),
         act(),
         conv(out_channels, out_channels, 3, padding=1),
+        nn.BatchNorm2d(out_channels),
         act()
     )
 

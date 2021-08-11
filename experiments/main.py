@@ -186,7 +186,6 @@ def main():
                     total += labels.size(0)
                     if phase == 'train':
                         loss.backward()
-
                         optimizer.step()
 
                     # statistics
@@ -274,12 +273,12 @@ def main():
         with open(os.path.join(args.save_dir, "log_te_iou_" + config_short_name + ".txt"), "a") as f:
             f.write("%s\n" % test_iou)
 
-        plot_fig(preds[0].detach().cpu().numpy(), f"pred_test")
-        plot_fig(labels[0].detach().cpu().numpy(), "groundtruth_test")
+        # plot_fig(preds[0].detach().cpu().numpy(), f"pred_test")
+        # plot_fig(labels[0].detach().cpu().numpy(), "groundtruth_test")
 
 
     msk = predict_id('6120_2_3', model, [0.4, 0.1, 0.4, 0.3, 0.3, 0.5, 0.3, 0.6, 0.1, 0.1])
-    plot_fig(msk, f"pred_test")
+    plot_fig(msk, f"pred_test.jpg")
 
     print()
 
