@@ -269,7 +269,7 @@ def main():
 
         print('Test IoU: {:.4f}'.format(test_iou))
 
-        with open(os.path.join(args.save_dir, "log_te_iou_" + config_short_name + ".txt"), "a") as f:
+        with open(os.path.join(args.save_dir, "log_te_iou_" + config_short_name + ".txt"), "w+") as f:
             f.write("%s\n" % test_iou)
 
 
