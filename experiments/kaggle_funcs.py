@@ -280,12 +280,13 @@ def predict_id(id, model, trs):
 
         x = 2 * np.transpose(line, (0, 3, 1, 2)) - 1
         model.train(False)
-        tmp = model(torch.from_numpy(x).float().cuda())
+        tmp = torch.sigmoid(model(torch.from_numpy(x).float().cuda()))
         for j in range(tmp.shape[0]):
             prd[:, i * ISZ:(i + 1) * ISZ, j * ISZ:(j + 1) * ISZ] = tmp[j].detach().cpu().numpy()
 
     # trs = [0.4, 0.1, 0.4, 0.3, 0.3, 0.5, 0.3, 0.6, 0.1, 0.1]
-    for i in range(N_Cls):
+    for i in range(10):
         prd[i] = prd[i] > trs[i]
+    print(len(prd[prd == True]))
 
     return prd[:, :img.shape[0], :img.shape[1]]

@@ -68,8 +68,9 @@ BETA = config.getfloat("loss", "beta")
 GAMMA = config.getfloat("loss", "gamma")
 
 IoU = IoU(num_classes=2)
-tversky_focal =  FocalTverskyLoss(alpha=ALPHA, beta=BETA, gamma=GAMMA)
+trs = [0.4, 0.1, 0.4, 0.3, 0.3, 0.5, 0.3, 0.6, 0.1, 0.1]
 
+bce =  torch.nn.BCEWithLogitsLoss()#alpha=ALPHA, beta=BETA, gamma=GAMMA)
 
 # define file name with configs for saving the model
 def get_short_name(name):
@@ -86,7 +87,7 @@ def main():
     device = "cuda"
     if args.model == "psp":
         from models.qpsp import PSPNet
-        model = PSPNet(quaternion=args.quaternion, loss=tversky_focal).to(device)
+        model = PSPNet(quaternion=args.quaternion, loss=bce).to(device)
     if args.model == "swin":
         from models.qswin import SwinTransformer
         model = SwinTransformer(quaternion=args.quaternion).to(device)
@@ -161,7 +162,7 @@ def main():
                     inputs, labels = data
                     
                     # inputs = 2*inputs -1
-                    inputs, labels = inputs.to(device).float(), labels.to(device).long()
+                    inputs, labels = inputs.to(device).float(), labels.to(device).float()
                     # zero the parameter gradients
                     optimizer.zero_grad()
 
@@ -172,16 +173,17 @@ def main():
                             loss = main_loss + ALPHA_AUX * aux_loss
                         else:
                             outputs = model(inputs)
-                            loss = tversky_focal(outputs, labels)
+                            loss = bce(outputs, labels)
 
                     else:
                         with torch.no_grad():
                             if args.model == "psp":
                                 outputs = model(inputs, labels)
-                                loss = tversky_focal(outputs, labels)
+                                loss = bce(outputs, labels)
                             else:
                                 outputs = model(inputs)
-                                loss = tversky_focal(outputs, labels)
+                                
+                                loss = bce(outputs, labels)
 
                     total += labels.size(0)
                     if phase == 'train':
@@ -193,7 +195,7 @@ def main():
                     for i in range(10):
                         preds[:, i, ...] = (preds[:, i, ...] > trs[i])
 
-                    iou = IoU(preds, labels.detach().cpu())
+                    iou = IoU(preds, labels.detach().cpu().long())
                     running_metric_iou += iou.detach().item()
                     
                     running_loss += loss.detach().item()
@@ -244,21 +246,21 @@ def main():
         for data in tqdm(test_loader):
             # get the inputs
             inputs, labels = data
-            inputs, labels = inputs.to(device).float(), labels.to(device).long()
+            inputs, labels = inputs.to(device).float(), labels.to(device).float()
 
             with torch.no_grad():
                 if args.model == "psp":
                     outputs = model(inputs, labels)
-                    loss = tversky_focal(outputs, labels)
+                    loss = bce(outputs, labels)
                 else:
                     outputs = model(inputs)
-                    loss = tversky_focal(outputs, labels)
+                    loss = bce(outputs, labels)
 
             preds = torch.sigmoid(outputs).detach().cpu()
             for i in range(10):
                 preds[:, i, ...] = (preds[:, i, ...] > trs[i])
 
-            iou = IoU(preds, labels.detach().cpu())
+            iou = IoU(preds, labels.detach().cpu().long())
             test_metric_iou += iou.detach().item()
 
             total += labels.size(0)
@@ -272,7 +274,9 @@ def main():
 
 
     msk = predict_id('6120_2_3', model, [0.4, 0.1, 0.4, 0.3, 0.3, 0.5, 0.3, 0.6, 0.1, 0.1])
-    plot_fig(msk, os.path.join(args.save_dir, "pred_test"))
+    plt.figure()
+    plt.imshow(msk[1], cmap="gray")
+    plt.savefig(os.path.join(args.save_dir, "pred_test"))
 
     print()
 
