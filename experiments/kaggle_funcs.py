@@ -269,8 +269,8 @@ def predict_id(id, model, trs):
     img = M(id)
     x = stretch_n(img)
 
-    cnv = np.zeros((960, 960, 8)).astype(np.float32)
-    prd = np.zeros((N_Cls, 960, 960)).astype(np.float32)
+    cnv = np.zeros((960, 960, 8)).astype(np.float16)
+    prd = np.zeros((N_Cls, 960, 960)).astype(np.float16)
     cnv[:img.shape[0], :img.shape[1], :] = x
 
     for i in range(0, 6):
@@ -285,8 +285,38 @@ def predict_id(id, model, trs):
             prd[:, i * ISZ:(i + 1) * ISZ, j * ISZ:(j + 1) * ISZ] = tmp[j].detach().cpu().numpy()
 
     # trs = [0.4, 0.1, 0.4, 0.3, 0.3, 0.5, 0.3, 0.6, 0.1, 0.1]
+    y = np.zeros((img.shape[0], img.shape[1], N_Cls))
     for i in range(10):
         prd[i] = prd[i] > trs[i]
-    print(len(prd[prd == True]))
+        y[..., i] = generate_mask_for_image_and_class(
+                    (img.shape[0], img.shape[1]), id, z + 1
+                    )
+    return prd[:, :img.shape[0], :img.shape[1]], img, y
 
-    return prd[:, :img.shape[0], :img.shape[1]]
+
+def calc_jacc(model, img, msk):
+
+    prd = torch.sigmoid(model(torch.from_numpy(img).float().cuda().unsqueeze(0).permute(0,3,1,2)))
+    avg, trs = [], []
+
+    for i in range(N_Cls):
+        t_msk = msk[:, i, :, :]
+        t_prd = prd[:, i, :, :]
+        t_msk = t_msk.reshape(msk.shape[0] * msk.shape[2], msk.shape[3])
+        t_prd = t_prd.reshape(msk.shape[0] * msk.shape[2], msk.shape[3])
+
+        m, b_tr = 0, 0
+        for j in range(10):
+            tr = j / 10.0
+            pred_binary_mask = t_prd > tr
+
+            jk = jaccard_similarity_score(t_msk, pred_binary_mask)
+            if jk > m:
+                m = jk
+                b_tr = tr
+        print(i, m, b_tr)
+        avg.append(m)
+        trs.append(b_tr)
+
+    score = sum(avg) / 10.0
+    return score, avg

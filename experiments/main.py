@@ -16,7 +16,7 @@ sys.path.append('hTorch/')
 sys.path.append('pytorch-image-models/')
 
 from madgrad import MADGRAD
-from kaggle_funcs import stick_all_train, get_patches, predict_id
+from kaggle_funcs import stick_all_train, get_patches, predict_id, calc_jacc
 from loss import FocalTverskyLoss
 
 parser = argparse.ArgumentParser(description='htorch training and testing')
@@ -30,9 +30,17 @@ parser.add_argument('-l', '--save-last', help='save only last epoch', action='st
 
 args = parser.parse_args()
 
+def to_rgb(input):
+    img = np.zeros(tuple([input.shape[1]]) + tuple([input.shape[2]]) + tuple([3]))
+    img[:, :, 0] = input[4]
+    img[:, :, 1] = input[2]
+    img[:, :, 2] = input[1]
+
+    return (img * 255).astype(np.uint8)
+
 def plot_fig(input, name):
     
-    plt.figure(figsize=[5, 5])
+    plt.figure(figsize=[20, 20])
     fig, axes = plt.subplots(2,5)
     axes[0][0].imshow(input[0], cmap="gray")
     axes[0][1].imshow(input[1], cmap="gray")
@@ -45,7 +53,7 @@ def plot_fig(input, name):
     axes[1][2].imshow(input[7], cmap="gray")
     axes[1][3].imshow(input[8], cmap="gray")
     axes[1][4].imshow(input[9], cmap="gray")
-    plt.savefig(name + ".jpg")
+    plt.savefig(name)
 
 if not os.path.exists(args.save_dir):
     os.makedirs(args.save_dir)
@@ -272,13 +280,18 @@ def main():
         with open(os.path.join(args.save_dir, "log_te_iou_" + config_short_name + ".txt"), "w+") as f:
             f.write("%s\n" % test_iou)
 
+    del x_test, y_test, test, test_loader 
+    total_iou, avg = calc_jacc(model, img, msk)
+    print('Total jaccard: {:.4f}'.format(test_iou))
 
-    msk = predict_id('6120_2_3', model, [0.4, 0.1, 0.4, 0.3, 0.3, 0.5, 0.3, 0.6, 0.1, 0.1])
-    plt.figure()
-    plt.imshow(msk[1], cmap="gray")
-    plt.savefig(os.path.join(args.save_dir, "pred_test"))
+    pred, img, target = predict_id('6120_2_3', model, [0.4, 0.1, 0.4, 0.3, 0.3, 0.5, 0.3, 0.6, 0.1, 0.1])
+    plot_fig(pred, args.save_dir + "pred_test")
+    plot_fig(target, args.save_dir + "groundtruth_test")    
+    plt.figure(figsize=[20,20])
+    plt.imshow(to_rgb(img))
+    plt.savefig(args. save_dir + "image")
 
-    print()
+    
 
 if __name__ == '__main__':
     main()
