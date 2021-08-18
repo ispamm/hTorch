@@ -11,6 +11,7 @@ import re
 import matplotlib.pyplot as plt
 from torchmetrics import IoU, F1
 from torchgeometry.losses import TverskyLoss
+from sklearn.metrics import jaccard_similarity_score
 
 sys.path.append('hTorch/')
 sys.path.append('pytorch-image-models/')
@@ -137,7 +138,12 @@ def main():
 
         lr_scheduler = ReduceLROnPlateau(optimizer, mode='min', patience=3, verbose=True)
         
-        x_train, y_train = get_patches(img, msk, 3000)
+        # x_train, y_train = get_patches(img, msk, 3000)
+        x_train = np.stack(np.split(np.stack(np.split(img, 25)), 25, axis = 2)).reshape(25*25, 167, 167, 8).astype(np.float16)
+        del img
+        y_train = np.squeeze(np.stack(np.split(np.stack(np.split(msk, 25)), 25, axis = 2)).reshape(25*25, 167, 167, 10)).astype(np.float16)
+        del msk
+
         train = torch.utils.data.TensorDataset(torch.from_numpy(x_train), torch.from_numpy(y_train))
         train_loader = torch.utils.data.DataLoader(train, batch_size=BATCH_SIZE, shuffle=SHUFFLE, pin_memory=True,
                                          num_workers=0, drop_last=True)
@@ -251,6 +257,8 @@ def main():
         test_metric_f1 = 0.0
         test_metric_f1_crf = 0.0
         total = 0
+
+        avg, trs = [], []
         for data in tqdm(test_loader):
             # get the inputs
             inputs, labels = data
@@ -265,31 +273,46 @@ def main():
                     loss = bce(outputs, labels)
 
             preds = torch.sigmoid(outputs).detach().cpu()
-            for i in range(10):
-                preds[:, i, ...] = (preds[:, i, ...] > trs[i])
+            class_jk = []
+            m, b_tr = 0, 0
 
-            iou = IoU(preds, labels.detach().cpu().long())
-            test_metric_iou += iou.detach().item()
+            for i in range(10):
+              for j in range(10):
+                  tr = j / 10.0
+                  pred_binary_mask = preds[:, i, ...] > tr
+
+                  jk = jaccard_similarity_score(pred_binary_mask.detach().cpu().long().numpy().reshape(-1,10), labels[:, i, ...].detach().cpu().long().numpy().reshape(-1, 10))
+                  if jk > m:
+                      m = jk
+                      b_tr = tr
+
+              class_jk.append(m)
+
+            avg.append(class_jk)
+            trs.append(b_tr)
+
+
+            # test_metric_iou += jk#.detach().item()
 
             total += labels.size(0)
+        test_iou = np.mean(np.array(avg), axis = 0)
+        test_iou_tot = np.mean(test_iou)
 
-        test_iou = test_metric_iou / total
-
-        print('Test IoU: {:.4f}'.format(test_iou))
+        print('Test IoU: {} Avg IoU: {}'.format(list(test_iou), test_iou_tot))
 
         with open(os.path.join(args.save_dir, "log_te_iou_" + config_short_name + ".txt"), "w+") as f:
-            f.write("%s\n" % test_iou)
+            f.write("%s\n" % " ".join(str([test_iou, test_iou_tot])))
 
-    del x_test, y_test, test, test_loader 
-    total_iou, avg = calc_jacc(model, img, msk)
-    print('Total jaccard: {:.4f}'.format(test_iou))
+    # del x_test, y_test, test, test_loader 
+    # total_iou, avg = calc_jacc(model, img, msk)
 
     pred, img, target = predict_id('6120_2_3', model, [0.4, 0.1, 0.4, 0.3, 0.3, 0.5, 0.3, 0.6, 0.1, 0.1])
-    plot_fig(pred, args.save_dir + "pred_test")
-    plot_fig(target, args.save_dir + "groundtruth_test")    
+
+    plot_fig(pred.astype(np.float32), args.save_dir + "/pred_test")
+    plot_fig(target.astype(np.float32), args.save_dir + "/groundtruth_test")    
     plt.figure(figsize=[20,20])
-    plt.imshow(to_rgb(img))
-    plt.savefig(args. save_dir + "image")
+    plt.imshow(to_rgb(img.astype(np.float32)))
+    plt.savefig(args.save_dir + "/image")
 
     
 

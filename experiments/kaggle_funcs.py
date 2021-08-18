@@ -289,26 +289,32 @@ def predict_id(id, model, trs):
     for i in range(10):
         prd[i] = prd[i] > trs[i]
         y[..., i] = generate_mask_for_image_and_class(
-                    (img.shape[0], img.shape[1]), id, z + 1
+                    (img.shape[0], img.shape[1]), id, i + 1
                     )
     return prd[:, :img.shape[0], :img.shape[1]], img, y
 
 
 def calc_jacc(model, img, msk):
+    
+    reshaped_img = np.stack(np.split(np.stack(np.split(img, 25)), 25, axis = 2)).reshape(25*25, 167, 167, 8).astype(np.float16)
+    del img
+    reshaped_msk = np.squeeze(np.stack(np.split(np.stack(np.split(msk, 25)), 25, axis = 2)).reshape(25*25, 167, 167, 10)).astype(np.float16)
+    del msk
 
-    prd = torch.sigmoid(model(torch.from_numpy(img).float().cuda().unsqueeze(0).permute(0,3,1,2)))
+    prd = np.stack([model(torch.from_numpy(reshaped_img[i:i+1, :160, :160]).permute(0,3,1,2).float().cuda()).detach().cpu().numpy() for i in range(len(reshaped_img))]).astype(np.float16)
     avg, trs = [], []
 
     for i in range(N_Cls):
-        t_msk = msk[:, i, :, :]
+        print(reshaped_msk.shape, prd.shape)
+        t_msk = reshaped_msk[:, :160, :160, i]
         t_prd = prd[:, i, :, :]
-        t_msk = t_msk.reshape(msk.shape[0] * msk.shape[2], msk.shape[3])
-        t_prd = t_prd.reshape(msk.shape[0] * msk.shape[2], msk.shape[3])
+        print(t_msk.shape[0], t_msk.shape[1], t_msk.shape[2])
 
         m, b_tr = 0, 0
         for j in range(10):
             tr = j / 10.0
             pred_binary_mask = t_prd > tr
+            print("dopo")
 
             jk = jaccard_similarity_score(t_msk, pred_binary_mask)
             if jk > m:
