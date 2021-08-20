@@ -44,16 +44,34 @@ def plot_fig(input, name):
     plt.figure(figsize=[20, 20])
     fig, axes = plt.subplots(2,5)
     axes[0][0].imshow(input[0], cmap="gray")
-    axes[0][1].imshow(input[1], cmap="gray")
-    axes[0][2].imshow(input[2], cmap="gray")
-    axes[0][3].imshow(input[3], cmap="gray")
-    axes[0][4].imshow(input[4], cmap="gray")
+    axes[0][0].title.set_text("Buildings")
 
+    axes[0][1].imshow(input[1], cmap="gray")
+    axes[0][1].title.set_text("Man-made struct")
+
+    axes[0][2].imshow(input[2], cmap="gray")
+    axes[0][2].title.set_text("Road")
+
+    axes[0][3].imshow(input[3], cmap="gray")
+    axes[0][3].title.set_text("Track")
+
+    axes[0][4].imshow(input[4], cmap="gray")
+    axes[0][4].title.set_text("Trees")
+    
     axes[1][0].imshow(input[5], cmap="gray")
+    axes[1][0].title.set_text("Crops")
+
     axes[1][1].imshow(input[6], cmap="gray")
+    axes[1][1].title.set_text("Waterway")
+
     axes[1][2].imshow(input[7], cmap="gray")
+    axes[1][2].title.set_text("Standing water")
+
     axes[1][3].imshow(input[8], cmap="gray")
+    axes[1][3].title.set_text("Large vehicle")
+
     axes[1][4].imshow(input[9], cmap="gray")
+    axes[1][4].title.set_text("Small vehicle")
     plt.savefig(name)
 
 if not os.path.exists(args.save_dir):
@@ -138,11 +156,8 @@ def main():
 
         lr_scheduler = ReduceLROnPlateau(optimizer, mode='min', patience=3, verbose=True)
         
-        # x_train, y_train = get_patches(img, msk, 3000)
-        x_train = np.stack(np.split(np.stack(np.split(img, 25)), 25, axis = 2)).reshape(25*25, 167, 167, 8).astype(np.float16)
-        del img
-        y_train = np.squeeze(np.stack(np.split(np.stack(np.split(msk, 25)), 25, axis = 2)).reshape(25*25, 167, 167, 10)).astype(np.float16)
-        del msk
+        x_train, y_train = get_patches(img, msk, 3000)
+
 
         train = torch.utils.data.TensorDataset(torch.from_numpy(x_train), torch.from_numpy(y_train))
         train_loader = torch.utils.data.DataLoader(train, batch_size=BATCH_SIZE, shuffle=SHUFFLE, pin_memory=True,
@@ -247,8 +262,12 @@ def main():
 
     else:
 
-        x_test, y_test = get_patches(img, msk, 3000)
-        test = torch.utils.data.TensorDataset(torch.from_numpy(x_test), torch.from_numpy(y_test))
+        x_test = np.stack(np.split(np.stack(np.split(img, 25)), 25, axis = 2)).reshape(25*25, 167, 167, 8).astype(np.float16)
+        del img
+        y_test = np.squeeze(np.stack(np.split(np.stack(np.split(msk, 25)), 25, axis = 2)).reshape(25*25, 167, 167, 10)).astype(np.float16)
+        del msk
+        print(x_test.shape)
+        test = torch.utils.data.TensorDataset(torch.from_numpy(np.transpose(x_test[:,:160, :160, :], (0,3,1,2))), torch.from_numpy(np.transpose(y_test[:,:160, :160, :], (0,3,1,2))))
         test_loader = torch.utils.data.DataLoader(test, batch_size=BATCH_SIZE, shuffle=SHUFFLE, pin_memory=True,
                                          num_workers=0, drop_last=True)        
         model.train(False)
@@ -291,9 +310,6 @@ def main():
             avg.append(class_jk)
             trs.append(b_tr)
 
-
-            # test_metric_iou += jk#.detach().item()
-
             total += labels.size(0)
         test_iou = np.mean(np.array(avg), axis = 0)
         test_iou_tot = np.mean(test_iou)
@@ -301,17 +317,15 @@ def main():
         print('Test IoU: {} Avg IoU: {}'.format(list(test_iou), test_iou_tot))
 
         with open(os.path.join(args.save_dir, "log_te_iou_" + config_short_name + ".txt"), "w+") as f:
-            f.write("%s\n" % " ".join(str([test_iou, test_iou_tot])))
+            f.write("\n".join(["Per-Class IoU", *list(map(str, list(test_iou))), "Average IoU", str(test_iou_tot)]))
 
-    # del x_test, y_test, test, test_loader 
-    # total_iou, avg = calc_jacc(model, img, msk)
 
     pred, img, target = predict_id('6120_2_3', model, [0.4, 0.1, 0.4, 0.3, 0.3, 0.5, 0.3, 0.6, 0.1, 0.1])
 
     plot_fig(pred.astype(np.float32), args.save_dir + "/pred_test")
-    plot_fig(target.astype(np.float32), args.save_dir + "/groundtruth_test")    
+    # plot_fig(target.astype(np.float32), args.save_dir + "/groundtruth_test")    
     plt.figure(figsize=[20,20])
-    plt.imshow(to_rgb(img.astype(np.float32)))
+    plt.imshow(to_rgb(np.transpose(img, (2,0,1)).astype(np.float32)))
     plt.savefig(args.save_dir + "/image")
 
     

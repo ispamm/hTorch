@@ -267,11 +267,11 @@ def get_scalers(im_size, x_max, y_min):
 
 def predict_id(id, model, trs):
     img = M(id)
-    x = stretch_n(img)
+    img = stretch_n(img)
 
     cnv = np.zeros((960, 960, 8)).astype(np.float16)
     prd = np.zeros((N_Cls, 960, 960)).astype(np.float16)
-    cnv[:img.shape[0], :img.shape[1], :] = x
+    cnv[:img.shape[0], :img.shape[1], :] = img
 
     for i in range(0, 6):
         line = []
@@ -314,7 +314,6 @@ def calc_jacc(model, img, msk):
         for j in range(10):
             tr = j / 10.0
             pred_binary_mask = t_prd > tr
-            print("dopo")
 
             jk = jaccard_similarity_score(t_msk, pred_binary_mask)
             if jk > m:
