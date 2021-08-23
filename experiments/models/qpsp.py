@@ -52,7 +52,7 @@ class PPM(torch.nn.Module):
 
 
 class PSPNet(nn.Module):
-    def __init__(self, quaternion=True, layers=LAYERS, bins=(1, 2, 3, 6), dropout=DROPOUT, classes=10, zoom_factor=8,
+    def __init__(self, quaternion=False, layers=LAYERS, bins=(1, 2, 3, 6), dropout=DROPOUT, classes=10, zoom_factor=8,
                  use_ppm=True, pretrained=False, training=True, loss=None):
         super(PSPNet, self).__init__()
         assert layers in [50, 101, 152]
@@ -92,7 +92,7 @@ class PSPNet(nn.Module):
             self.ppm = PPM(fea_dim, int(fea_dim / len(bins)), bins)
             fea_dim *= 2
         self.cls = nn.Sequential(
-            conv(fea_dim, 512 // factor, kernel_size=5, padding=1, bias=False),
+            conv(fea_dim, 512 // factor, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(512),
             self.act(),
             nn.Dropout2d(p=dropout),

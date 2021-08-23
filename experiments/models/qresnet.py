@@ -210,7 +210,7 @@ def resnet34(pretrained=False, quaternion=True, **kwargs):
     return model
 
 
-def resnet50(pretrained=False, quaternion=True, **kwargs):
+def resnet50(pretrained=False, quaternion=False, **kwargs):
     """Constructs a ResNet-50 model.
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
@@ -225,7 +225,7 @@ def resnet50(pretrained=False, quaternion=True, **kwargs):
     return model
 
 
-def resnet101(pretrained=False, quaternion=True, **kwargs):
+def resnet101(pretrained=False, quaternion=False, **kwargs):
     """Constructs a ResNet-101 model.
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
@@ -239,7 +239,7 @@ def resnet101(pretrained=False, quaternion=True, **kwargs):
     return model
 
 
-def resnet152(pretrained=False, quaternion=True, **kwargs):
+def resnet152(pretrained=False, quaternion=False, **kwargs):
     """Constructs a ResNet-152 model.
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
