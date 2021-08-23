@@ -10,7 +10,7 @@ from htorch.functions import QModReLU
 def set_ops(quaternion):
     global conv, act, factor
     conv = QConv2d if quaternion else nn.Conv2d
-    act = QModReLU if quaternion else nn.ReLU
+    act = nn.ReLU
     factor = 4 if quaternion else 1
 
 

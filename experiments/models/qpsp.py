@@ -23,7 +23,7 @@ DROPOUT = config.getfloat("psp", "dropout")
 def set_ops(quaternion):
     global conv, act, factor
     conv = QConv2d if quaternion else nn.Conv2d
-    act = QModReLU if quaternion else nn.ReLU
+    act = nn.ReLU
     factor = 4 if quaternion else 1
 
 
@@ -73,8 +73,7 @@ class PSPNet(nn.Module):
         else:
             resnet = resnet152(pretrained=pretrained, quaternion=quaternion)
 
-        self.layer0 = nn.Sequential(resnet.conv1, resnet.bn1, resnet.conv2, resnet.bn2, resnet.conv3, resnet.bn3,
-                                    resnet.maxpool)
+        self.layer0 = nn.Sequential(resnet.conv1, resnet.bn1, resnet.conv2, resnet.bn2, resnet.conv3, resnet.bn3, resnet.maxpool)
         self.layer1, self.layer2, self.layer3, self.layer4 = resnet.layer1, resnet.layer2, resnet.layer3, resnet.layer4
 
         for n, m in self.layer3.named_modules():

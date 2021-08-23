@@ -121,6 +121,9 @@ def main():
     if args.model == "unet":
         from models.qunet import UNet
         model = UNet(quaternion=args.quaternion).to(device)
+    
+    total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print("total trainable parameters: ", total_params)
 
     resume = 0
     if args.checkpoint_weight_path:
@@ -158,7 +161,6 @@ def main():
         
         x_train, y_train = get_patches(img, msk, 3000)
 
-
         train = torch.utils.data.TensorDataset(torch.from_numpy(x_train), torch.from_numpy(y_train))
         train_loader = torch.utils.data.DataLoader(train, batch_size=BATCH_SIZE, shuffle=SHUFFLE, pin_memory=True,
                                          num_workers=0, drop_last=True)
@@ -190,7 +192,6 @@ def main():
                     # get the inputs
                     inputs, labels = data
                     
-                    # inputs = 2*inputs -1
                     inputs, labels = inputs.to(device).float(), labels.to(device).float()
                     # zero the parameter gradients
                     optimizer.zero_grad()
@@ -232,7 +233,7 @@ def main():
 
                 epoch_loss = running_loss / total
                 if phase == 'val':
-                        lr_scheduler.step(epoch_loss)
+                    lr_scheduler.step(epoch_loss)
                 epoch_iou = running_metric_iou / total
                 
                 print('{} Loss: {:.4f} IoU: {:.4f}'.format(
