@@ -114,7 +114,7 @@ def main():
     device = "cuda"
     if args.model == "psp":
         from models.qpsp import PSPNet
-        model = PSPNet(quaternion=args.quaternion, loss=bce).to(device)
+        model = PSPNet(quaternion=args.quaternion).to(device)
     if args.model == "swin":
         from models.qswin import SwinTransformer
         model = SwinTransformer(quaternion=args.quaternion).to(device)
@@ -191,7 +191,6 @@ def main():
                 for data in tqdm(dset_loaders[phase]):
                     # get the inputs
                     inputs, labels = data
-                    
                     inputs, labels = inputs.to(device).float(), labels.to(device).float()
                     # zero the parameter gradients
                     optimizer.zero_grad()
@@ -199,8 +198,10 @@ def main():
                     # forward
                     if phase == "train":
                         if args.model == "psp":
-                            outputs, main_loss, aux_loss = model(inputs, labels)
-                            loss = main_loss + ALPHA_AUX * aux_loss
+                            outputs, aux = model(inputs)
+                            main_loss = bce(outputs, labels)
+                            aux_loss = bce(aux, labels)
+                            loss = main_loss# + ALPHA_AUX * aux_loss
                         else:
                             outputs = model(inputs)
                             loss = bce(outputs, labels)
@@ -208,11 +209,12 @@ def main():
                     else:
                         with torch.no_grad():
                             if args.model == "psp":
-                                outputs = model(inputs, labels)
-                                loss = bce(outputs, labels)
+                                outputs, aux = model(inputs)
+                                main_loss = bce(outputs, labels)
+                                aux_loss = bce(aux, labels)
+                                loss = main_loss# + ALPHA_AUX * aux_loss
                             else:
                                 outputs = model(inputs)
-                                
                                 loss = bce(outputs, labels)
 
                     total += labels.size(0)
@@ -232,8 +234,8 @@ def main():
 
 
                 epoch_loss = running_loss / total
-                if phase == 'val':
-                    lr_scheduler.step(epoch_loss)
+                # if phase == 'val':
+                    # lr_scheduler.step(epoch_loss)
                 epoch_iou = running_metric_iou / total
                 
                 print('{} Loss: {:.4f} IoU: {:.4f}'.format(
