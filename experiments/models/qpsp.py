@@ -229,7 +229,7 @@ class DecodePSPFeature(nn.Module):
 
         self.cbr = conv2DBatchNormRelu(
             in_channels=4096 // factor, out_channels=512 // factor, kernel_size=3, stride=1, padding=1, dilation=1, bias=False)
-        self.dropout = nn.Dropout2d(p=0.1)
+        self.dropout = nn.Dropout2d(p=0.0)
         self.classification = nn.Conv2d(
             in_channels=512, out_channels=n_classes, kernel_size=1, stride=1, padding=0)
 

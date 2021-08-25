@@ -80,8 +80,6 @@ if not os.path.exists(args.save_dir):
 config = configparser.ConfigParser()
 config.read("hTorch/experiments/constants.cfg")
 
-DATA_SIZE_TRAIN = config.getint("dataset", "data_size_train")
-DATA_SIZE_VAL = config.getint("dataset", "data_size_val")
 BATCH_SIZE = config.getint("dataset", "batch_size")
 SHUFFLE = config.getboolean("dataset", "shuffle")
 
@@ -89,10 +87,6 @@ NUM_EPOCHS = config.getint("training", "num_epochs")
 LEARNING_RATE = config.getfloat("training", "learning_rate")
 
 ALPHA_AUX = config.getfloat("training", "num_epochs")
-
-ALPHA = config.getfloat("loss", "alpha")
-BETA = config.getfloat("loss", "beta")
-GAMMA = config.getfloat("loss", "gamma")
 
 IoU = IoU(num_classes=2)
 trs = [0.4, 0.1, 0.4, 0.3, 0.3, 0.5, 0.3, 0.6, 0.1, 0.1]
@@ -171,7 +165,6 @@ def main():
                                          num_workers=0, drop_last=True)
 
         dset_loaders = {"train": train_loader, "val": val_loader}
-        dset_sizes = {"train": DATA_SIZE_TRAIN // BATCH_SIZE, "val": DATA_SIZE_VAL // BATCH_SIZE}
         for epoch in range(NUM_EPOCHS):
 
             print('-' * 40)
@@ -234,8 +227,8 @@ def main():
 
 
                 epoch_loss = running_loss / total
-                # if phase == 'val':
-                    # lr_scheduler.step(epoch_loss)
+                if phase == 'val':
+                    lr_scheduler.step(epoch_loss)
                 epoch_iou = running_metric_iou / total
                 
                 print('{} Loss: {:.4f} IoU: {:.4f}'.format(
@@ -269,7 +262,7 @@ def main():
         del img
         y_test = np.squeeze(np.stack(np.split(np.stack(np.split(msk, 25)), 25, axis = 2)).reshape(25*25, 167, 167, 10)).astype(np.float16)
         del msk
-        print(x_test.shape)
+
         test = torch.utils.data.TensorDataset(torch.from_numpy(np.transpose(x_test[:,:160, :160, :], (0,3,1,2))), torch.from_numpy(np.transpose(y_test[:,:160, :160, :], (0,3,1,2))))
         test_loader = torch.utils.data.DataLoader(test, batch_size=BATCH_SIZE, shuffle=SHUFFLE, pin_memory=True,
                                          num_workers=0, drop_last=True)        

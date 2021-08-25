@@ -33,25 +33,17 @@ from crf import dense_crf_wrapper
 # constants
 import configparser
 
-config = configparser.SafeConfigParser()
-config.read("hTorch/experiments/constants.cfg")
-
-WIDTH = config.getint("dataset", "width")
-HEIGHT = config.getint("dataset", "height")
-LEARNING_RATE = config.getfloat("training", "learning_rate")
-
 _logger = logging.getLogger(__name__)
 
-act = nn.GELU
-lin = nn.Linear
-factor = 1
-
+conv, conv_transp, lin, act, factor = nn.Conv2d, nn.ConvTranspose2d, nn.Linear, nn.GELU, 1
+n_classes = 10
 
 def set_ops(quaternion):
-    global lin, conv_transp, act, factor
+    global conv, conv_transp, lin, act, factor
+    conv = QConv2d if quaternion else nn.Conv2d   
     conv_transp = QConvTranspose2d if quaternion else nn.ConvTranspose2d
     lin = QLinear if quaternion else nn.Linear
-    act = QModReLU if quaternion else nn.GELU
+    act = nn.GELU
     factor = 4 if quaternion else 1
 
 
@@ -61,7 +53,7 @@ _logger = logging.getLogger(__name__)
 def _cfg(url='', **kwargs):
     return {
         'url': url,
-        'num_classes': 10, 'input_size': (8, WIDTH, HEIGHT), 'pool_size': None,
+        'num_classes': 10, 'input_size': (8, 160, 160), 'pool_size': None,
 
         'crop_pct': .9, 'interpolation': 'bicubic', 'fixed_input_size': True,
         'mean': IMAGENET_DEFAULT_MEAN, 'std': IMAGENET_DEFAULT_STD,
@@ -72,19 +64,19 @@ def _cfg(url='', **kwargs):
 
 default_cfgs = {
     # patch models (my experiments)
-    'swin_base_patch4_window12_384': _cfg(
-        url='https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_base_patch4_window12_384_22kto1k.pth',
-        input_size=(3, 384, 384), crop_pct=1.0),
+    'swin_base_patch4_window12_160': _cfg(
+        url='https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_base_patch4_window12_160_22kto1k.pth',
+        input_size=(3, 160, 160), crop_pct=1.0),
 
     'swin_base_patch4_window7_224': _cfg(
         url='https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_base_patch4_window7_224_22kto1k.pth',
-        input_size=(3, 384, 384),
+        input_size=(3, 160, 160),
 
     ),
 
-    'swin_large_patch4_window12_384': _cfg(
-        url='https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_large_patch4_window12_384_22kto1k.pth',
-        input_size=(3, 384, 384), crop_pct=1.0),
+    'swin_large_patch4_window12_160': _cfg(
+        url='https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_large_patch4_window12_160_22kto1k.pth',
+        input_size=(3, 160, 160), crop_pct=1.0),
 
     'swin_large_patch4_window7_224': _cfg(
         url='https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_large_patch4_window7_224_22kto1k.pth',
@@ -98,17 +90,17 @@ default_cfgs = {
         url='https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_tiny_patch4_window7_224.pth',
     ),
 
-    'swin_base_patch4_window12_384_in22k': _cfg(
-        url='https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_base_patch4_window12_384_22k.pth',
-        input_size=(3, 384, 384), crop_pct=1.0, num_classes=21841),
+    'swin_base_patch4_window12_160_in22k': _cfg(
+        url='https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_base_patch4_window12_160_22k.pth',
+        input_size=(3, 160, 160), crop_pct=1.0, num_classes=21841),
 
     'swin_base_patch4_window7_224_in22k': _cfg(
         url='https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_base_patch4_window7_224_22k.pth',
         num_classes=21841),
 
-    'swin_large_patch4_window12_384_in22k': _cfg(
-        url='https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_large_patch4_window12_384_22k.pth',
-        input_size=(3, 384, 384), crop_pct=1.0, num_classes=21841),
+    'swin_large_patch4_window12_160_in22k': _cfg(
+        url='https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_large_patch4_window12_160_22k.pth',
+        input_size=(3, 160, 160), crop_pct=1.0, num_classes=21841),
 
     'swin_large_patch4_window7_224_in22k': _cfg(
         url='https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_large_patch4_window7_224_22k.pth',
@@ -116,6 +108,92 @@ default_cfgs = {
 
 }
 
+class conv2DBatchNormRelu(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding, dilation, bias):
+        super().__init__()
+        self.conv = conv(in_channels, out_channels,
+                              kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation, bias=bias)
+        self.batchnorm = nn.BatchNorm2d(out_channels * factor)
+        self.relu = act()
+        # inplace=True, decrease memory consumption by not preserving input  
+        
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.batchnorm(x)
+        outputs = self.relu(x)
+
+        return outputs
+class PyramidPooling(nn.Module):
+    def __init__(self, in_channels, pool_sizes, height, width):
+        super().__init__()
+
+        self.height = height
+        self.width = width
+
+        out_channels = int(in_channels / len(pool_sizes))
+
+        # pool_sizes: [6, 3, 2, 1]
+        self.avpool_1 = nn.AdaptiveAvgPool2d(output_size=pool_sizes[0])
+        self.cbr_1 = conv2DBatchNormRelu(
+            in_channels, out_channels, kernel_size=1, stride=1, padding=0, dilation=1, bias=False)
+
+        self.avpool_2 = nn.AdaptiveAvgPool2d(output_size=pool_sizes[1])
+        self.cbr_2 = conv2DBatchNormRelu(
+            in_channels, out_channels, kernel_size=1, stride=1, padding=0, dilation=1, bias=False)
+
+        self.avpool_3 = nn.AdaptiveAvgPool2d(output_size=pool_sizes[2])
+        self.cbr_3 = conv2DBatchNormRelu(
+            in_channels, out_channels, kernel_size=1, stride=1, padding=0, dilation=1, bias=False)
+
+        self.avpool_4 = nn.AdaptiveAvgPool2d(output_size=pool_sizes[3])
+        self.cbr_4 = conv2DBatchNormRelu(
+            in_channels, out_channels, kernel_size=1, stride=1, padding=0, dilation=1, bias=False)
+
+    def forward(self, x):
+
+        out1 = self.cbr_1(self.avpool_1(x))
+        out1 = F.interpolate(out1, size=(
+            self.height, self.width), mode="bilinear", align_corners=True)
+
+        out2 = self.cbr_2(self.avpool_2(x))
+        out2 = F.interpolate(out2, size=(
+            self.height, self.width), mode="bilinear", align_corners=True)
+
+        out3 = self.cbr_3(self.avpool_3(x))
+        out3 = F.interpolate(out3, size=(
+            self.height, self.width), mode="bilinear", align_corners=True)
+
+        out4 = self.cbr_4(self.avpool_4(x))
+        out4 = F.interpolate(out4, size=(
+            self.height, self.width), mode="bilinear", align_corners=True)
+
+        if (x.size(2) != out1.size(2) or out1.size(2) != out2.size(2)):
+            print(x.size(), out1.size(), out2.size(), out3.size(), out4.size())
+         
+        output = torch.cat([x, out1, out2, out3, out4], dim=1)
+        
+        return output
+
+class DecodePSPFeature(nn.Module):
+    def __init__(self, height, width, n_classes):
+        super().__init__()
+
+        self.height = height
+        self.width = width
+
+        self.cbr = conv2DBatchNormRelu(
+            in_channels=4096 // factor, out_channels=512 // factor, kernel_size=3, stride=1, padding=1, dilation=1, bias=False)
+        self.dropout = nn.Dropout2d(p=0.0)
+        self.classification = nn.Conv2d(
+            in_channels=512, out_channels=n_classes, kernel_size=1, stride=1, padding=0)
+
+    def forward(self, x):
+        x = self.cbr(x)
+        x = self.dropout(x)
+        x = self.classification(x)
+        output = F.interpolate(
+            x, size=(self.height, self.width), mode="bilinear", align_corners=True)
+        return output
 
 def window_partition(x, window_size: int):
     """
@@ -474,7 +552,7 @@ class SwinTransformer(nn.Module):
         use_checkpoint (bool): Whether to use checkpointing to save memory. Default: False
     """
 
-    def __init__(self, img_size=384, patch_size=4, in_chans=8, num_classes=10,
+    def __init__(self, img_size=160, patch_size=4, in_chans=8, num_classes=10,
                  embed_dim=96 // factor, depths=(2, 2, 6, 2), num_heads=(3, 6, 12, 24),
                  window_size=6, mlp_ratio=4., qkv_bias=True, qk_scale=None,
                  drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1,
@@ -529,22 +607,32 @@ class SwinTransformer(nn.Module):
                 use_checkpoint=use_checkpoint)
             ]
         self.layers = nn.Sequential(*layers)
-        self.norm = norm_layer(self.num_features)
-        self.avgpool = nn.AdaptiveAvgPool1d(1)
+        
+        img_size = 160
+        img_size_8 = 20  # img_size to 1/8
+        
+        self.pyramid_pooling = PyramidPooling(in_channels=2048 // factor, pool_sizes=[
+            6, 3, 2, 1], height=img_size_8, width=img_size_8)
 
-        self.upconv1 = conv_transp(self.num_features // (factor), self.num_features // (2 * factor), 4, stride=2,
-                                   padding=1)
-        self.upconv2 = conv_transp(self.num_features // (2 * factor), self.num_features // (4 * factor), 4, stride=2,
-                                   padding=1)
-        self.upconv3 = conv_transp(self.num_features // (4 * factor), self.num_features // (8 * factor), 4, stride=2,
-                                   padding=1)
-        self.upconv4 = conv_transp(self.num_features // (8 * factor), self.num_features // (16 * factor), 4, stride=2,
-                                   padding=1)
-        self.upconv5 = conv_transp(self.num_features // (16 * factor), self.num_features // (32 * factor), 4, stride=2,
-                                   padding=1)
+        self.decode_feature = DecodePSPFeature(
+            height=img_size, width=img_size, n_classes=n_classes)
 
-        self.head = nn.Conv2d(self.num_features // 32, num_classes, kernel_size=(3, 3),
-                              padding=1) if num_classes > 0 else nn.Identity()
+        # self.norm = norm_layer(self.num_features)
+        # self.avgpool = nn.AdaptiveAvgPool1d(1)
+
+        # self.upconv1 = conv_transp(self.num_features // (factor), self.num_features // (2 * factor), 4, stride=2,
+        #                            padding=1)
+        # self.upconv2 = conv_transp(self.num_features // (2 * factor), self.num_features // (4 * factor), 4, stride=2,
+        #                            padding=1)
+        # self.upconv3 = conv_transp(self.num_features // (4 * factor), self.num_features // (8 * factor), 4, stride=2,
+        #                            padding=1)
+        # self.upconv4 = conv_transp(self.num_features // (8 * factor), self.num_features // (16 * factor), 4, stride=2,
+        #                            padding=1)
+        # self.upconv5 = conv_transp(self.num_features // (16 * factor), self.num_features // (32 * factor), 4, stride=2,
+        #                            padding=1)
+
+        # self.head = nn.Conv2d(self.num_features // 32, num_classes, kernel_size=(3, 3),
+        #                       padding=1) if num_classes > 0 else nn.Identity()
 
         assert weight_init in ('jax', 'jax_nlhb', 'nlhb', '')
         head_bias = -math.log(self.num_classes) if 'nlhb' in weight_init else 0.
@@ -571,14 +659,16 @@ class SwinTransformer(nn.Module):
             x = x + self.absolute_pos_embed
         x = self.pos_drop(x)
         x = self.layers(x)
-        x = self.norm(x)  # B L C
-        x = x.view(-1, x.size(2), int(x.size(1) ** 0.5), int(x.size(1) ** 0.5))
+        x = self.pyramid_pooling(x)
+        x = self.decode_feature(x)
+        # x = self.norm(x)  # B L C
+        # x = x.view(-1, x.size(2), int(x.size(1) ** 0.5), int(x.size(1) ** 0.5))
 
-        x = self.upconv1(x)
-        x = self.upconv2(x)
-        x = self.upconv3(x)
-        x = self.upconv4(x)
-        x = self.upconv5(x)
+        # x = self.upconv1(x)
+        # x = self.upconv2(x)
+        # x = self.upconv3(x)
+        # x = self.upconv4(x)
+        # x = self.upconv5(x)
 
         return x
 
@@ -612,12 +702,12 @@ def _create_swin_transformer(variant, pretrained=False, default_cfg=None, **kwar
 
 
 @register_model
-def swin_base_patch4_window12_384(pretrained=False, **kwargs):
-    """ Swin-B @ 384x384, pretrained ImageNet-22k, fine tune 1k
+def swin_base_patch4_window12_160(pretrained=False, **kwargs):
+    """ Swin-B @ 160x160, pretrained ImageNet-22k, fine tune 1k
     """
     model_kwargs = dict(
         patch_size=4, window_size=12, embed_dim=128, depths=(2, 2, 18, 2), num_heads=(4, 8, 16, 32), **kwargs)
-    return _create_swin_transformer('swin_base_patch4_window12_384', pretrained=pretrained, **model_kwargs)
+    return _create_swin_transformer('swin_base_patch4_window12_160', pretrained=pretrained, **model_kwargs)
 
 
 @register_model
@@ -630,12 +720,12 @@ def swin_base_patch4_window7_224(pretrained=False, **kwargs):
 
 
 @register_model
-def swin_large_patch4_window12_384(pretrained=False, **kwargs):
-    """ Swin-L @ 384x384, pretrained ImageNet-22k, fine tune 1k
+def swin_large_patch4_window12_160(pretrained=False, **kwargs):
+    """ Swin-L @ 160x160, pretrained ImageNet-22k, fine tune 1k
     """
     model_kwargs = dict(
         patch_size=4, window_size=12, embed_dim=192, depths=(2, 2, 18, 2), num_heads=(6, 12, 24, 48), **kwargs)
-    return _create_swin_transformer('swin_large_patch4_window12_384', pretrained=pretrained, **model_kwargs)
+    return _create_swin_transformer('swin_large_patch4_window12_160', pretrained=pretrained, **model_kwargs)
 
 
 @register_model
@@ -666,12 +756,12 @@ def swin_tiny_patch4_window7_224(pretrained=False, **kwargs):
 
 
 @register_model
-def swin_base_patch4_window12_384_in22k(pretrained=False, **kwargs):
-    """ Swin-B @ 384x384, trained ImageNet-22k
+def swin_base_patch4_window12_160_in22k(pretrained=False, **kwargs):
+    """ Swin-B @ 160x160, trained ImageNet-22k
     """
     model_kwargs = dict(
         patch_size=4, window_size=12, embed_dim=128, depths=(2, 2, 18, 2), num_heads=(4, 8, 16, 32), **kwargs)
-    return _create_swin_transformer('swin_base_patch4_window12_384_in22k', pretrained=pretrained, **model_kwargs)
+    return _create_swin_transformer('swin_base_patch4_window12_160_in22k', pretrained=pretrained, **model_kwargs)
 
 
 @register_model
@@ -684,12 +774,12 @@ def swin_base_patch4_window7_224_in22k(pretrained=False, **kwargs):
 
 
 @register_model
-def swin_large_patch4_window12_384_in22k(pretrained=False, **kwargs):
-    """ Swin-L @ 384x384, trained ImageNet-22k
+def swin_large_patch4_window12_160_in22k(pretrained=False, **kwargs):
+    """ Swin-L @ 160x160, trained ImageNet-22k
     """
     model_kwargs = dict(
         patch_size=4, window_size=12, embed_dim=192, depths=(2, 2, 18, 2), num_heads=(6, 12, 24, 48), **kwargs)
-    return _create_swin_transformer('swin_large_patch4_window12_384_in22k', pretrained=pretrained, **model_kwargs)
+    return _create_swin_transformer('swin_large_patch4_window12_160_in22k', pretrained=pretrained, **model_kwargs)
 
 
 @register_model
