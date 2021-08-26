@@ -12,6 +12,20 @@ import torch.utils.checkpoint as checkpoint
 import numpy as np
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 
+from htorch.layers import QConv2d, QLinear
+
+
+act = nn.GELU
+conv = nn.Conv2d
+lin = nn.Linear
+factor = 1
+
+def set_ops(quaternion):
+    global lin, conv, act, factor
+    lin = QLinear if quaternion else nn.Linear
+    conv = QConv2d if quaternion else nn.Conv2d
+    act = nn.GELU
+    factor = 4 if quaternion else 1
 
 
 class PPM(nn.ModuleList):
@@ -41,9 +55,9 @@ class PPM(nn.ModuleList):
             self.append(
                 nn.Sequential(
                     nn.AdaptiveAvgPool2d(pool_scale),
-                    nn.Conv2d(
-                        self.in_channels,
-                        self.channels,
+                    conv(
+                        self.in_channels // factor,
+                        self.channels // factor,
                         1),
                     nn.BatchNorm2d(self.channels), 
                     nn.ReLU()
@@ -88,9 +102,9 @@ class UPerHead(nn.Module):
             act_cfg=None,
             align_corners=None)
         self.bottleneck = nn.Sequential(
-            nn.Conv2d(
-            self.in_channels[-1] + len(pool_scales) * self.channels,
-            self.channels,
+            conv(
+            (self.in_channels[-1] + len(pool_scales) * self.channels) // factor,
+            self.channels // factor,
             3,
             padding=1), 
             nn.BatchNorm2d(self.channels), 
@@ -101,17 +115,17 @@ class UPerHead(nn.Module):
         self.fpn_convs = nn.ModuleList()
         for in_channels in self.in_channels[:-1]:  # skip the top layer
             l_conv = nn.Sequential(
-              nn.Conv2d(
-                in_channels,
-                self.channels,
+              conv(
+                in_channels // factor,
+                self.channels // factor,
                 1),
             nn.BatchNorm2d(self.channels), 
             nn.ReLU())  
                 
             fpn_conv = nn.Sequential(
-                nn.Conv2d(
-                  self.channels,
-                  self.channels,
+                conv(
+                  self.channels // factor,
+                  self.channels // factor,
                   3,
                   padding=1),
               nn.BatchNorm2d(self.channels), 
@@ -121,14 +135,14 @@ class UPerHead(nn.Module):
             self.fpn_convs.append(fpn_conv)
 
         self.fpn_bottleneck = nn.Sequential(
-          nn.Conv2d(
-            len(self.in_channels) * self.channels,
-            self.channels,
+          conv(
+            len(self.in_channels) * self.channels // factor,
+            self.channels // factor,
             3,
             padding=1),
             nn.BatchNorm2d(self.channels), 
             nn.ReLU())
-        
+        self.dropout = nn.Dropout2d(0.1)
         self.cls_seg = nn.Conv2d(self.channels, 10, 1)
 
     def psp_forward(self, inputs):
@@ -181,6 +195,7 @@ class UPerHead(nn.Module):
         fpn_outs = torch.cat(fpn_outs, dim=1)
 
         output = self.fpn_bottleneck(fpn_outs)
+        output = self.dropout(output)
         output = self.cls_seg(output)
         return output
 
@@ -191,9 +206,9 @@ class Mlp(nn.Module):
         super().__init__()
         out_features = out_features or in_features
         hidden_features = hidden_features or in_features
-        self.fc1 = nn.Linear(in_features, hidden_features)
+        self.fc1 = lin(in_features // factor, hidden_features // factor)
         self.act = act_layer()
-        self.fc2 = nn.Linear(hidden_features, out_features)
+        self.fc2 = lin(hidden_features // factor, out_features // factor)
         self.drop = nn.Dropout(drop)
 
     def forward(self, x):
@@ -277,9 +292,9 @@ class WindowAttention(nn.Module):
         relative_position_index = relative_coords.sum(-1)  # Wh*Ww, Wh*Ww
         self.register_buffer("relative_position_index", relative_position_index)
 
-        self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
+        self.qkv = lin(dim, dim * 4, bias=qkv_bias)
         self.attn_drop = nn.Dropout(attn_drop)
-        self.proj = nn.Linear(dim, dim)
+        self.proj = lin(dim, dim)
         self.proj_drop = nn.Dropout(proj_drop)
 
         trunc_normal_(self.relative_position_bias_table, std=.02)
@@ -340,7 +355,7 @@ class SwinTransformerBlock(nn.Module):
 
     def __init__(self, dim, num_heads, window_size=7, shift_size=0,
                  mlp_ratio=4., qkv_bias=True, qk_scale=None, drop=0., attn_drop=0., drop_path=0.,
-                 act_layer=nn.GELU, norm_layer=nn.LayerNorm):
+                 act_layer=act, norm_layer=nn.LayerNorm):
         super().__init__()
         self.dim = dim
         self.num_heads = num_heads
@@ -432,7 +447,7 @@ class PatchMerging(nn.Module):
     def __init__(self, dim, norm_layer=nn.LayerNorm):
         super().__init__()
         self.dim = dim
-        self.reduction = nn.Linear(4 * dim, 2 * dim, bias=False)
+        self.reduction = lin(4 * dim // factor, 2 * dim // factor, bias=False)
         self.norm = norm_layer(4 * dim)
 
     def forward(self, x, H, W):
@@ -457,7 +472,9 @@ class PatchMerging(nn.Module):
         x2 = x[:, 0::2, 1::2, :]  # B H/2 W/2 C
         x3 = x[:, 1::2, 1::2, :]  # B H/2 W/2 C
         x = torch.cat([x0, x1, x2, x3], -1)  # B H/2 W/2 4*C
-        x = x.view(B, -1, 4 * C)  # B H/2*W/2 4*C
+        x = x.view(B, -1, C).squeeze(0)  # B H/2*W/2 4*C
+        if factor == 1:	
+            x = torch.cat([*torch.chunk(x, 4, 1)], 2).squeeze()
 
         x = self.norm(x)
         x = self.reduction(x)
@@ -587,7 +604,7 @@ class PatchEmbed(nn.Module):
         self.in_chans = in_chans
         self.embed_dim = embed_dim
 
-        self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
+        self.proj = conv(in_chans // factor, embed_dim // factor, kernel_size=patch_size, stride=patch_size)
         if norm_layer is not None:
             self.norm = norm_layer(embed_dim)
         else:
@@ -663,6 +680,8 @@ class SwinTransformer(nn.Module):
                  use_checkpoint=False, 
                  quaternion=False):
         super().__init__()
+        
+        set_ops(quaternion)
 
         self.pretrain_img_size = pretrain_img_size
         self.num_layers = len(depths)
@@ -790,14 +809,6 @@ class SwinTransformer(nn.Module):
                 outs.append(out)
 
         inputs = [outs[i] for i in range(len(outs))]
-        # upsampled_inputs = [
-        #     F.interpolate(
-        #         x,
-        #         size=inputs[0].shape[2:],
-        #         mode='bilinear',
-        #         align_corners=True) for x in inputs
-        # ]
-        # inputs = torch.cat(upsampled_inputs, dim=1)
 
         out = self.head(inputs)
         out = F.interpolate(out, size=original_size, mode="bilinear", align_corners=True)

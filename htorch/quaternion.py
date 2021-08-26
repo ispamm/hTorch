@@ -100,6 +100,14 @@ def reshape(self, *args, **kwargs):
 def view(self, *args, **kwargs):
     return self.q.view(*args, **kwargs)
 
+@implements(torch.Tensor.size)
+def size(self, *args, **kwargs):
+    return self.q.size(*args, **kwargs)
+
+@implements(torch.Tensor.flatten)
+def flatten(self, *args, **kwargs):
+    return self.q.flatten(*args, **kwargs)
+
 
 @implements(torch.allclose)
 def allclose(input1, input2, *args, **kwargs):
