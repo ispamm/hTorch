@@ -281,8 +281,10 @@ def main():
 
             with torch.no_grad():
                 if args.model == "psp":
-                    outputs = model(inputs, labels)
-                    loss = bce(outputs, labels)
+                    outputs, aux = model(inputs)
+                    main_loss = bce(outputs, labels)
+                    aux_loss = bce(aux, labels)
+                    loss = main_loss# + ALPHA_AUX * aux_loss
                 else:
                     outputs = model(inputs)
                     loss = bce(outputs, labels)

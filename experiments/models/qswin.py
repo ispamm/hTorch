@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.checkpoint as checkpoint
 import numpy as np
-from timm.models.layers import DropPath, to_2tuple, trunc_normal_
+from timm.models.layers import DropPath, Mlp, to_2tuple, trunc_normal_
 
 from htorch.layers import QConv2d, QLinear
 
@@ -199,27 +199,6 @@ class UPerHead(nn.Module):
         output = self.cls_seg(output)
         return output
 
-class Mlp(nn.Module):
-    """ Multilayer perceptron."""
-
-    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.):
-        super().__init__()
-        out_features = out_features or in_features
-        hidden_features = hidden_features or in_features
-        self.fc1 = lin(in_features // factor, hidden_features // factor)
-        self.act = act_layer()
-        self.fc2 = lin(hidden_features // factor, out_features // factor)
-        self.drop = nn.Dropout(drop)
-
-    def forward(self, x):
-        x = self.fc1(x)
-        x = self.act(x)
-        x = self.drop(x)
-        x = self.fc2(x)
-        x = self.drop(x)
-        return x
-
-
 def window_partition(x, window_size):
     """
     Args:
@@ -292,7 +271,7 @@ class WindowAttention(nn.Module):
         relative_position_index = relative_coords.sum(-1)  # Wh*Ww, Wh*Ww
         self.register_buffer("relative_position_index", relative_position_index)
 
-        self.qkv = lin(dim, dim * 4, bias=qkv_bias)
+        self.qkv = lin(dim, dim * 3, bias=qkv_bias)
         self.attn_drop = nn.Dropout(attn_drop)
         self.proj = lin(dim, dim)
         self.proj_drop = nn.Dropout(proj_drop)
@@ -353,7 +332,7 @@ class SwinTransformerBlock(nn.Module):
         norm_layer (nn.Module, optional): Normalization layer.  Default: nn.LayerNorm
     """
 
-    def __init__(self, dim, num_heads, window_size=7, shift_size=0,
+    def __init__(self, dim, num_heads, window_size=8, shift_size=0,
                  mlp_ratio=4., qkv_bias=True, qk_scale=None, drop=0., attn_drop=0., drop_path=0.,
                  act_layer=act, norm_layer=nn.LayerNorm):
         super().__init__()
@@ -372,8 +351,8 @@ class SwinTransformerBlock(nn.Module):
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
         self.norm2 = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
-        self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
-
+        self.act_layer = nn.GELU
+        self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=self.act_layer, drop=drop)
         self.H = None
         self.W = None
 
@@ -391,6 +370,7 @@ class SwinTransformerBlock(nn.Module):
 
         shortcut = x
         x = self.norm1(x)
+
         x = x.view(B, H, W, C)
 
         # pad feature maps to multiples of window size
@@ -398,6 +378,7 @@ class SwinTransformerBlock(nn.Module):
         pad_r = (self.window_size - W % self.window_size) % self.window_size
         pad_b = (self.window_size - H % self.window_size) % self.window_size
         x = F.pad(x, (0, 0, pad_l, pad_r, pad_t, pad_b))
+
         _, Hp, Wp, _ = x.shape
 
         # cyclic shift
@@ -410,6 +391,7 @@ class SwinTransformerBlock(nn.Module):
 
         # partition windows
         x_windows = window_partition(shifted_x, self.window_size)  # nW*B, window_size, window_size, C
+
         x_windows = x_windows.view(-1, self.window_size * self.window_size, C)  # nW*B, window_size*window_size, C
 
         # W-MSA/SW-MSA
@@ -448,7 +430,7 @@ class PatchMerging(nn.Module):
         super().__init__()
         self.dim = dim
         self.reduction = lin(4 * dim // factor, 2 * dim // factor, bias=False)
-        self.norm = norm_layer(4 * dim)
+        self.norm = norm_layer(dim)
 
     def forward(self, x, H, W):
         """ Forward function.
@@ -473,10 +455,10 @@ class PatchMerging(nn.Module):
         x3 = x[:, 1::2, 1::2, :]  # B H/2 W/2 C
         x = torch.cat([x0, x1, x2, x3], -1)  # B H/2 W/2 4*C
         x = x.view(B, -1, C).squeeze(0)  # B H/2*W/2 4*C
-        if factor == 1:	
-            x = torch.cat([*torch.chunk(x, 4, 1)], 2).squeeze()
 
         x = self.norm(x)
+        if factor == 1:	
+            x = torch.cat([*torch.chunk(x, 4, 1)], 2).squeeze()
         x = self.reduction(x)
 
         return x
@@ -505,7 +487,7 @@ class BasicLayer(nn.Module):
                  dim,
                  depth,
                  num_heads,
-                 window_size=7,
+                 window_size=8,
                  mlp_ratio=4.,
                  qkv_bias=True,
                  qk_scale=None,
@@ -566,7 +548,6 @@ class BasicLayer(nn.Module):
             for w in w_slices:
                 img_mask[:, h, w, :] = cnt
                 cnt += 1
-
         mask_windows = window_partition(img_mask, self.window_size)  # nW, window_size, window_size, 1
         mask_windows = mask_windows.view(-1, self.window_size * self.window_size)
         attn_mask = mask_windows.unsqueeze(1) - mask_windows.unsqueeze(2)
@@ -665,7 +646,7 @@ class SwinTransformer(nn.Module):
                  embed_dim=96,
                  depths=[2, 2, 6, 2],
                  num_heads=[3, 6, 12, 24],
-                 window_size=7,
+                 window_size=8,
                  mlp_ratio=4.,
                  qkv_bias=True,
                  qk_scale=None,
@@ -792,8 +773,10 @@ class SwinTransformer(nn.Module):
             # interpolate the position embedding to the corresponding size
             absolute_pos_embed = F.interpolate(self.absolute_pos_embed, size=(Wh, Ww), mode='bicubic')
             x = (x + absolute_pos_embed).flatten(2).transpose(1, 2)  # B Wh*Ww C
+
         else:
             x = x.flatten(2).transpose(1, 2)
+
         x = self.pos_drop(x)
 
         outs = []

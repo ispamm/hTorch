@@ -569,6 +569,17 @@ def layer_norm(input, *args, **kwargs):
     return torch.nn.functional.layer_norm(input.q, *args, **kwargs)
 
 
+"""
+TO FIX
+"""
+
+@implements(torch.nn.functional.gelu)
+def gelu(input, *args, **kwargs):
+    return torch.nn.functional.gelu(input.q, *args, **kwargs)
+
+
+
+
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ---------------------------- QuaternionTensor ------------------------------------------

@@ -280,7 +280,7 @@ def predict_id(id, model, trs):
 
         x = 2 * np.transpose(line, (0, 3, 1, 2)) - 1
         model.train(False)
-        tmp = torch.sigmoid(model(torch.from_numpy(x).float().cuda()))
+        tmp = torch.sigmoid(model(torch.from_numpy(x).float().cuda())[0])
         for j in range(tmp.shape[0]):
             prd[:, i * ISZ:(i + 1) * ISZ, j * ISZ:(j + 1) * ISZ] = tmp[j].detach().cpu().numpy()
 
