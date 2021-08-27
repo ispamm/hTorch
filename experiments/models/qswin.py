@@ -52,7 +52,7 @@ class PPM(nn.ModuleList):
                         self.in_channels,
                         self.channels,
                         1),
-                    nn.BatchNorm2d(self.channels), 
+                    nn.BatchNorm2d(self.channels * factor), 
                     nn.ReLU()
                     ))
                     
@@ -62,11 +62,13 @@ class PPM(nn.ModuleList):
         ppm_outs = []
         for ppm in self:
             ppm_out = ppm(x)
+            
             upsampled_ppm_out = F.interpolate(
                 ppm_out,
                 size=x.size()[2:],
                 mode='bilinear',
                 align_corners=True)
+            
             ppm_outs.append(upsampled_ppm_out)
         return ppm_outs
 
@@ -100,7 +102,7 @@ class UPerHead(nn.Module):
             self.channels,
             3,
             padding=1), 
-            nn.BatchNorm2d(self.channels), 
+            nn.BatchNorm2d(self.channels * factor), 
             nn.ReLU())            
         
         # FPN Module
@@ -112,7 +114,7 @@ class UPerHead(nn.Module):
                 in_channels,
                 self.channels,
                 1),
-            nn.BatchNorm2d(self.channels), 
+            nn.BatchNorm2d(self.channels * factor), 
             nn.ReLU())  
                 
             fpn_conv = nn.Sequential(
@@ -121,7 +123,7 @@ class UPerHead(nn.Module):
                   self.channels,
                   3,
                   padding=1),
-              nn.BatchNorm2d(self.channels), 
+              nn.BatchNorm2d(self.channels * factor), 
               nn.ReLU())
 
             self.lateral_convs.append(l_conv)
@@ -133,10 +135,10 @@ class UPerHead(nn.Module):
             self.channels,
             3,
             padding=1),
-            nn.BatchNorm2d(self.channels), 
+            nn.BatchNorm2d(self.channels * factor), 
             nn.ReLU())
         self.dropout = nn.Dropout2d(0.1)
-        self.cls_seg = nn.Conv2d(self.channels, 10, 1)
+        self.cls_seg = nn.Conv2d(self.channels * factor, 10, 1)
 
     def psp_forward(self, inputs):
         """Forward function of PSP module."""
@@ -144,7 +146,9 @@ class UPerHead(nn.Module):
         psp_outs = [x]
         psp_outs.extend(self.psp_modules(x))
         psp_outs = torch.cat(psp_outs, dim=1)
+        
         output = self.bottleneck(psp_outs)
+        
 
         return output
 
@@ -170,6 +174,7 @@ class UPerHead(nn.Module):
                 size=prev_shape,
                 mode='bilinear',
                 align_corners=True)
+            
 
         # build outputs
         fpn_outs = [
@@ -185,11 +190,13 @@ class UPerHead(nn.Module):
                 size=fpn_outs[0].shape[2:],
                 mode='bilinear',
                 align_corners=True)
+            
         fpn_outs = torch.cat(fpn_outs, dim=1)
 
         output = self.fpn_bottleneck(fpn_outs)
         output = self.dropout(output)
         output = self.cls_seg(output)
+        
         return output
 
 def window_partition(x, window_size):
@@ -203,6 +210,7 @@ def window_partition(x, window_size):
     B, H, W, C = x.shape
     x = x.view(B, H // window_size, window_size, W // window_size, window_size, C)
     windows = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(-1, window_size, window_size, C)
+    
     return windows
 
 
@@ -219,6 +227,7 @@ def window_reverse(windows, window_size, H, W):
     B = int(windows.shape[0] / (H * W / window_size / window_size))
     x = windows.view(B, H // window_size, W // window_size, window_size, window_size, -1)
     x = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(B, H, W, -1)
+    
     return x
 
 
@@ -241,7 +250,7 @@ class WindowAttention(nn.Module):
         self.dim = dim
         self.window_size = window_size  # Wh, Ww
         self.num_heads = num_heads
-        head_dim = dim // num_heads
+        head_dim = dim // num_heads * factor
         self.scale = qk_scale or head_dim ** -0.5
 
         # define a parameter table of relative position bias
@@ -276,24 +285,27 @@ class WindowAttention(nn.Module):
             mask: (0/-inf) mask with shape of (num_windows, Wh*Ww, Wh*Ww) or None
         """
         B_, N, C = x.shape
-        print("PRIMA DI QKV", x.shape)
         qkv = self.qkv(x)
-        print("QKVVVVVVVVVVVVVVVVVV", self.dim, qkv.shape)
+        
         qkv = qkv.reshape(B_, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
-        print("\n\n\n\nDOPO QKV\n\n\n")
+        
         q, k, v = qkv[0], qkv[1], qkv[2]  # make torchscript happy (cannot use tensor as tuple)
 
         q = q * self.scale
+        
         attn = (q @ k.transpose(-2, -1))
+        
 
         relative_position_bias = self.relative_position_bias_table[self.relative_position_index.view(-1)].view(
             self.window_size[0] * self.window_size[1], self.window_size[0] * self.window_size[1], -1)  # Wh*Ww,Wh*Ww,nH
+        
         relative_position_bias = relative_position_bias.permute(2, 0, 1).contiguous()  # nH, Wh*Ww, Wh*Ww
         attn = attn + relative_position_bias.unsqueeze(0)
 
         if mask is not None:
             nW = mask.shape[0]
             attn = attn.view(B_ // nW, nW, self.num_heads, N, N) + mask.unsqueeze(1).unsqueeze(0)
+            
             attn = attn.view(-1, self.num_heads, N, N)
             attn = self.softmax(attn)
         else:
@@ -302,8 +314,12 @@ class WindowAttention(nn.Module):
         attn = self.attn_drop(attn)
 
         x = (attn @ v).transpose(1, 2).reshape(B_, N, C)
+        
         x = self.proj(x)
+        
         x = self.proj_drop(x)
+        
+
         return x
 
 
@@ -344,7 +360,7 @@ class SwinTransformerBlock(nn.Module):
         self.norm2 = norm_layer(dim * factor)
         mlp_hidden_dim = int(dim * mlp_ratio)
         self.act_layer = nn.GELU
-        self.mlp = Mlp(in_features=dim * factor, hidden_features=mlp_hidden_dim // factor, act_layer=self.act_layer, drop=drop)
+        self.mlp = Mlp(in_features=dim * factor, hidden_features=mlp_hidden_dim * factor, act_layer=self.act_layer, drop=drop)
         self.H = None
         self.W = None
 
@@ -356,29 +372,32 @@ class SwinTransformerBlock(nn.Module):
             mask_matrix: Attention mask for cyclic shift.
         """
         B, L, C = x.shape
-        print("X SHAPE", x.shape)
+        
         H, W = self.H, self.W
         assert L == H * W, "input feature has wrong size"
 
         shortcut = x
         x = self.norm1(x)
-        print("NORM X", x.shape)
+        
 
         x = x.view(B, H, W, C)
-        print("VIEW X", x.shape)
+        
 
         # pad feature maps to multiples of window size
         pad_l = pad_t = 0
         pad_r = (self.window_size - W % self.window_size) % self.window_size
         pad_b = (self.window_size - H % self.window_size) % self.window_size
         x = F.pad(x, (0, 0, pad_l, pad_r, pad_t, pad_b))
+        
 
         _, Hp, Wp, _ = x.shape
 
         # cyclic shift
         if self.shift_size > 0:
             shifted_x = torch.roll(x, shifts=(-self.shift_size, -self.shift_size), dims=(1, 2))
+            
             attn_mask = mask_matrix
+            
         else:
             shifted_x = x
             attn_mask = None
@@ -387,14 +406,15 @@ class SwinTransformerBlock(nn.Module):
         x_windows = window_partition(shifted_x, self.window_size)  # nW*B, window_size, window_size, C
 
         x_windows = x_windows.view(-1, self.window_size * self.window_size, C)  # nW*B, window_size*window_size, C
-
+        
         # W-MSA/SW-MSA
         attn_windows = self.attn(x_windows, mask=attn_mask)  # nW*B, window_size*window_size, C
-
+        
         # merge windows
         attn_windows = attn_windows.reshape(-1, self.window_size, self.window_size, C)
+        
         shifted_x = window_reverse(attn_windows, self.window_size, Hp, Wp)  # B H' W' C
-
+        
         # reverse cyclic shift
         if self.shift_size > 0:
             x = torch.roll(shifted_x, shifts=(self.shift_size, self.shift_size), dims=(1, 2))
@@ -404,11 +424,12 @@ class SwinTransformerBlock(nn.Module):
         if pad_r > 0 or pad_b > 0:
             x = x[:, :H, :W, :].contiguous()
         
-        print("X SHAPE", x.shape)
+        
         x = x.view(B, H * W, C)
 
         # FFN
         x = shortcut + self.drop_path(x)
+        
         x = x + self.drop_path(self.mlp(self.norm2(x)))
 
         return x
@@ -424,7 +445,7 @@ class PatchMerging(nn.Module):
         super().__init__()
         self.dim = dim
         self.reduction = lin(4 * dim, 2 * dim, bias=False)
-        self.norm = norm_layer(dim)
+        self.norm = norm_layer(dim * factor)
 
     def forward(self, x, H, W):
         """ Forward function.
@@ -441,18 +462,23 @@ class PatchMerging(nn.Module):
         pad_input = (H % 2 == 1) or (W % 2 == 1)
         if pad_input:
             x = F.pad(x, (0, 0, 0, W % 2, 0, H % 2))
+            
 
         x0 = x[:, 0::2, 0::2, :]  # B H/2 W/2 C
         x1 = x[:, 1::2, 0::2, :]  # B H/2 W/2 C
         x2 = x[:, 0::2, 1::2, :]  # B H/2 W/2 C
         x3 = x[:, 1::2, 1::2, :]  # B H/2 W/2 C
         x = torch.cat([x0, x1, x2, x3], -1)  # B H/2 W/2 4*C
+        
         x = x.view(B, -1, C).squeeze(0)  # B H/2*W/2 4*C
+        
 
         x = self.norm(x)
 
         x = torch.cat([*torch.chunk(x, 4, 1)], 2).squeeze()
+        
         x = self.reduction(x)
+        
 
         return x
 
@@ -540,16 +566,20 @@ class BasicLayer(nn.Module):
                 img_mask[:, h, w, :] = cnt
                 cnt += 1
         mask_windows = window_partition(img_mask, self.window_size)  # nW, window_size, window_size, 1
+        
         mask_windows = mask_windows.view(-1, self.window_size * self.window_size)
         attn_mask = mask_windows.unsqueeze(1) - mask_windows.unsqueeze(2)
         attn_mask = attn_mask.masked_fill(attn_mask != 0, float(-100.0)).masked_fill(attn_mask == 0, float(0.0))
+        
 
         for blk in self.blocks:
             blk.H, blk.W = H, W
             if self.use_checkpoint:
                 x = checkpoint.checkpoint(blk, x, attn_mask)
+                
             else:
                 x = blk(x, attn_mask)
+                
         if self.downsample is not None:
             x_down = self.downsample(x, H, W)
             Wh, Ww = (H + 1) // 2, (W + 1) // 2
@@ -587,16 +617,20 @@ class PatchEmbed(nn.Module):
         _, _, H, W = x.size()
         if W % self.patch_size[1] != 0:
             x = F.pad(x, (0, self.patch_size[1] - W % self.patch_size[1]))
+            
         if H % self.patch_size[0] != 0:
             x = F.pad(x, (0, 0, 0, self.patch_size[0] - H % self.patch_size[0]))
+            
 
         x = self.proj(x)  # B C Wh Ww
+        
         if self.norm is not None:
             Wh, Ww = x.size(2), x.size(3)
             x = x.flatten(2).transpose(1, 2)
             x = self.norm(x)
+            
             x = x.transpose(1, 2).reshape(-1, self.embed_dim, Wh, Ww)
-
+            
         return x
 
 
@@ -762,9 +796,11 @@ class SwinTransformer(nn.Module):
             # interpolate the position embedding to the corresponding size
             absolute_pos_embed = F.interpolate(self.absolute_pos_embed, size=(Wh, Ww), mode='bicubic')
             x = (x + absolute_pos_embed).flatten(2).transpose(1, 2)  # B Wh*Ww C
+            
 
         else:
             x = x.flatten(2).transpose(1, 2)
+            
 
         x = self.pos_drop(x)
 
@@ -776,15 +812,18 @@ class SwinTransformer(nn.Module):
             if i in self.out_indices:
                 norm_layer = getattr(self, f'norm{i}')
                 x_out = norm_layer(x_out)
-                print("DOPO norm")
+                
 
                 out = x_out.view(-1, H, W, self.num_features[i]).permute(0, 3, 1, 2).contiguous()
+                
                 outs.append(out)
 
         inputs = [outs[i] for i in range(len(outs))]
 
         out = self.head(inputs)
+        
         out = F.interpolate(out, size=original_size, mode="bilinear", align_corners=True)
+        
         return out
 
     def train(self, mode=True):
