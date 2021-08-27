@@ -214,7 +214,6 @@ def main():
                     if phase == 'train':
                         loss.backward()
                         optimizer.step()
-
                     # statistics
                     preds = torch.sigmoid(outputs).detach().cpu()
                     for i in range(10):
@@ -321,7 +320,6 @@ def main():
     pred, img, target = predict_id('6120_2_3', model, [0.4, 0.1, 0.4, 0.3, 0.3, 0.5, 0.3, 0.6, 0.1, 0.1])
 
     plot_fig(pred.astype(np.float32), args.save_dir + "/pred_test")
-    # plot_fig(target.astype(np.float32), args.save_dir + "/groundtruth_test")    
     plt.figure(figsize=[20,20])
     plt.imshow(to_rgb(np.transpose(img, (2,0,1)).astype(np.float32)))
     plt.savefig(args.save_dir + "/image")
