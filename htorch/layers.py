@@ -206,7 +206,7 @@ class QLinear(nn.Module):
     Quaternion linear
     """
 
-    def __init__(self, in_channels, out_channels, bias=False, spinor=False):
+    def __init__(self, in_channels, out_channels, bias=True, spinor=False):
         super(QLinear, self).__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -232,10 +232,6 @@ class QLinear(nn.Module):
             self.bias = None
 
     def forward(self, x):
-        # if x.dim() == 3:
-          # print("PRIMA DI LINEAR", x.shape)
-            # x = torch.cat([*torch.chunk(x, 4, 1)], 2).squeeze()
-        print("QLINEAR", x.shape, self.weight.shape)
         return Q(F.linear(x, self.weight, self.bias))
 
 
@@ -436,7 +432,6 @@ class QMaxPool2d(nn.Module):
 class QBatchNorm2d(nn.Module):
     """
     Quaternion batch normalization 2d
-
     please check whitendxd in cplx module at https://github.com/ivannz
     """
 
