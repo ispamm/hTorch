@@ -13,153 +13,15 @@ def implements(torch_function):
     def decorator(func):
         HANDLEdFUNCTIONS[torch_function] = func
         return func
-
     return decorator
 
 
-# ----------------------------------- getters ---------------------------------------------
-
-@implements(torch.Tensor.shape.__get__)
-def shape(self):
-    """
-    Gets standard shape
-    """
-    return torch.Tensor.shape.__get__(self.q)
-
-
-@implements(torch.Tensor.T.__get__)
-def T(self):
-    return self.q.t()
-
-
-@implements(torch.Tensor.requires_grad.__get__)
-def get_requires_grad(self):
-    return self.q.requires_grad
-
-
-@implements(torch.Tensor.grad.__get__)
-def get_grad(self):
-    return self.q.grad
-
-
-@implements(torch.Tensor.__getitem__)
-def get_item(self, idx):
-    return torch.Tensor.__getitem__(self.q, idx)
-
-
-# ----------------------------------- setters -------------------------------------------------
-
-@implements(torch.Tensor.requires_grad.__set__)
-def set_requires_grad(self, requires_grad):
-    self.q.requires_grad = requires_grad
-
-
-@implements(torch.Tensor.grad.__set__)
-def set_grad(self, grad):
-    self.q.grad = grad
-
-
 # ----------------------------------- general ------------------------------------------------
-
-@implements(torch.Tensor.dim)
-def dim(self):
-    return self.q.dim()
-
-
-@implements(torch.Tensor.t)
-def t(self):
-    return self.q.t()
-
-
-@implements(torch.chunk)
-def chunk(input, *args, **kwargs):
-    return torch.chunk(input.q, *args, **kwargs)
 
 
 @implements(torch.Tensor.chunk)
 def chunk(input, *args, **kwargs):
     return torch.chunk(input.q, chunks=4, *args, **kwargs)
-
-
-@implements(torch.Tensor.cpu)
-def cpu(self):
-    return self.q.cpu()
-
-
-@implements(torch.Tensor.cuda)
-def cuda(self):
-    return self.q.cuda()
-
-
-@implements(torch.Tensor.reshape)
-def reshape(self, *args, **kwargs):
-    return self.q.reshape(*args, **kwargs)
-
-
-@implements(torch.Tensor.view)
-def view(self, *args, **kwargs):
-    return self.q.view(*args, **kwargs)
-
-@implements(torch.Tensor.size)
-def size(self, *args, **kwargs):
-    return self.q.size(*args, **kwargs)
-
-@implements(torch.Tensor.flatten)
-def flatten(self, *args, **kwargs):
-    return self.q.flatten(*args, **kwargs)
-
-
-@implements(torch.allclose)
-def allclose(input1, input2, *args, **kwargs):
-    if all(isinstance(i, QuaternionTensor) for i in [input1, input2]):
-        return torch.allclose(input1.q, input2.q)
-    else:
-        return torch.allclose(input1.q, input2)
-
-
-@implements(torch.cat)
-def cat(input, *args, **kwargs):
-    check_list = [isinstance(i, QuaternionTensor) for i in input]
-    if all(check_list):
-        return torch.cat([x.q for x in input], *args, **kwargs)
-    else:
-        return torch.cat([input[i].q if check_list[i] else input[i] for i in range(len(check_list))], *args, **kwargs)
-
-
-@implements(torch.stack)
-def stack(input, *args, **kwargs):
-    check_list = [isinstance(i, QuaternionTensor) for i in input]
-    if all(check_list):
-        return torch.stack([x.q for x in input], *args, **kwargs)
-    else:
-        return torch.stack([input[i].q if check_list[i] else input[i] for i in range(len(check_list))], *args, **kwargs)
-
-
-@implements(torch.Tensor.neg)
-def neg(input):
-    return input.__class__(-input.q)
-
-
-@implements(torch.nn.functional._pad)
-def pad(input, *args, **kwargs):
-    return torch.nn.functional._pad(input.q)
-
-
-@implements(torch.Tensor.squeeze)
-def squeeze(self, *args, **kwargs):
-    return self.q.squeeze(*args, **kwargs)
-
-
-@implements(torch.Tensor.unsqueeze)
-def unsqueeze(self, *args, **kwargs):
-    return self.q.unsqueeze(*args, **kwargs)
-
-
-# -----------------------------activation functions ------------------------------------------
-
-@implements(torch.nn.functional.relu)
-def relu(input, *args, **kwargs):
-    return torch.nn.functional.relu(input.q, *args, **kwargs)
 
 
 # ----------------------------------- conj ---------------------------------------------------
@@ -200,53 +62,6 @@ def inverse(self):
 def inverse(input):
     return input.inverse()
 
-
-# ----------------------------------- min ------------------------------------------------
-
-@implements(torch.Tensor.min)
-def min(self):
-    return torch.min(self.q)
-
-
-@implements(torch.min)
-def min(input):
-    return input.min()
-
-
-# ----------------------------------- max ------------------------------------------------
-
-@implements(torch.Tensor.max)
-def max(self):
-    return torch.max(self.q)
-
-
-@implements(torch.max)
-def max(input):
-    return input.max()
-
-
-# ----------------------------------- sum ------------------------------------------------
-
-@implements(torch.Tensor.sum)
-def sum(self, *args, **kwargs):
-    return torch.sum(self.q, *args, **kwargs)
-
-
-@implements(torch.sum)
-def sum(input, *args, **kwargs):
-    return input.sum(*args, **kwargs)
-
-
-# ----------------------------------- mean ------------------------------------------------
-
-@implements(torch.Tensor.mean)
-def mean(self, *args, **kwargs):
-    return torch.mean(self.q, *args, **kwargs)
-
-
-@implements(torch.mean)
-def mean(input, *args, **kwargs):
-    return input.mean(*args, **kwargs)
 
 
 # ----------------------------------- norm ------------------------------------------------
@@ -291,7 +106,6 @@ def add(self, other):
             out = self.q + other
 
     else:
-        print(self.shape)
         if other.__class__.__name__ == "QuaternionTensor":
             out = self.q + other.q
         elif isinstance(other, int):
@@ -306,8 +120,15 @@ def add(self, other):
 
 @implements(torch.add)
 def add(input1, input2):
-    return input1.add(input2)
+    return torch.Tensor.add(input1, input2)
 
+@implements(torch.Tensor.__add__)
+def add(input1, input2):
+    return torch.Tensor.add(input1, input2)
+
+@implements(torch.Tensor.add_)
+def add(input1, input2):
+    return torch.Tensor.add(input1, input2)
 
 # ----------------------------------- mul ------------------------------------------------
 
@@ -359,8 +180,15 @@ def mul(self, other):
 
 @implements(torch.mul)
 def mul(input1, input2):
-    return input1.mul(input2)
+    return torch.Tensor.mul(input1, input2)
 
+@implements(torch.Tensor.__mul__)
+def mul(input1, input2):
+    return torch.Tensor.mul(input1, input2)
+
+@implements(torch.Tensor.mul_)
+def mul(input1, input2):
+    return torch.Tensor.mul(input1, input2)
 
 # ----------------------------------- matmul ---------------------------------------------
 
@@ -371,7 +199,11 @@ def matmul(self, other):
 
 @implements(torch.matmul)
 def matmul(input1, input2):
-    return input1.matmul(input2)
+    return torch.Tensor.matmul(input1, input2)
+
+@implements(torch.Tensor.__matmul__)
+def matmul(input1, input2):
+    return torch.Tensor.matmul(input1, input2)
 
 
 # ----------------------------------- div ------------------------------------------------
@@ -407,8 +239,15 @@ def true_div(self, other):
 
 @implements(torch.div)
 def div(input1, input2):
-    return input1.div(input2)
+    return torch.Tensor.div(input1, input2)
 
+@implements(torch.Tensor.__div__)
+def div(input1, input2):
+    return torch.Tensor.div(input1, input2)
+
+@implements(torch.Tensor.div_)
+def div(input1, input2):
+    return torch.Tensor.div(input1, input2)
 
 # ----------------------------------- pow ------------------------------------------------
 
@@ -437,8 +276,15 @@ def pow(self, n):
 
 @implements(torch.pow)
 def div(input1, input2):
-    return input1.pow(input2)
+    return torch.Tensor.pow(input1, input2)
 
+@implements(torch.Tensor.__pow__)
+def div(input1, input2):
+    return torch.Tensor.pow(input1, input2)
+
+@implements(torch.Tensor.pow_)
+def div(input1, input2):
+    return torch.Tensor.pow(input1, input2)
 
 # ----------------------------------- exp ------------------------------------------------
 
@@ -505,78 +351,6 @@ def log(self):
 @implements(torch.log)
 def log(input):
     return input.log()
-
-
-# ----------------------------------- layers ------------------------------------------------
-
-@implements(torch.nn.functional.interpolate)
-def interpolate(input, *args, **kwargs):
-    return torch.nn.functional.interpolate(input.q, *args, **kwargs)
-
-
-@implements(torch.nn.functional.max_pool2d)
-def max_pool2d(input, *args, **kwargs):
-    return torch.nn.functional.max_pool2d(input.q, *args, **kwargs)
-
-
-@implements(torch.conv1d)
-def conv1d(input, *args, **kwargs):
-    return torch.conv1d(input.q, *args, **kwargs)
-
-
-@implements(torch.conv2d)
-def conv2d(input, *args, **kwargs):
-    return torch.conv2d(input.q, *args, **kwargs)
-
-
-@implements(torch.conv3d)
-def conv3d(input, *args, **kwargs):
-    return torch.conv3d(input.q, *args, **kwargs)
-
-
-@implements(torch.conv_transpose1d)
-def conv_transpose1d(input, *args, **kwargs):
-    return torch.conv_transpose1d(input.q, *args, **kwargs)
-
-
-@implements(torch.conv_transpose2d)
-def conv_transpose2d(input, *args, **kwargs):
-    return torch.conv_transpose2d(input.q, *args, **kwargs)
-
-
-@implements(torch.conv_transpose3d)
-def conv_transpose3d(input, *args, **kwargs):
-    return torch.conv_transpose3d(input.q, *args, **kwargs)
-
-
-@implements(torch.nn.functional.batch_norm)
-def bn(input, *args, **kwargs):
-    return torch.nn.functional.batch_norm(input.q, *args, **kwargs)
-
-
-@implements(torch.nn.functional.dropout)
-def dropout(input, *args, **kwargs):
-    return torch.nn.functional.dropout(input.q, *args, **kwargs)
-
-
-@implements(torch.nn.Dropout)
-def dropout(input, *args, **kwargs):
-    return torch.nn.functional.dropout(input.q, *args, **kwargs)
-
-
-@implements(torch.nn.functional.layer_norm)
-def layer_norm(input, *args, **kwargs):
-    return torch.nn.functional.layer_norm(input.q, *args, **kwargs)
-
-
-"""
-TO FIX
-"""
-
-@implements(torch.nn.functional.gelu)
-def gelu(input, *args, **kwargs):
-    return torch.nn.functional.gelu(input.q, *args, **kwargs)
-
 
 
 
@@ -765,7 +539,9 @@ class QuaternionTensor(torch.Tensor):
                 issubclass(t, QuaternionTensor)
                 for t in types
         ):
-            return NotImplemented
+            args = [a.q if isinstance(a, QuaternionTensor) else a for a in args]
+            return func(*args, **kwargs)
+        
         return HANDLEdFUNCTIONS[func](*args, **kwargs)
 
     def torch(self):
@@ -851,7 +627,7 @@ class QuaternionTensor(torch.Tensor):
         return self.a, self.b, self.c, self.d
 
     def __add__(self, other):
-        return torch.add(self, other)
+        return torch.Tensor.add(self, other)
 
     def __radd__(self, other):
         return self.__add__(other)
