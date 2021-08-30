@@ -3,7 +3,7 @@ import numpy as np
 import warnings
 import functools
 
-HANDLEdFUNCTIONS = {}
+HANDLED_FUNCTIONS = {}
 
 
 def implements(torch_function):
@@ -11,7 +11,7 @@ def implements(torch_function):
 
     @functools.wraps(torch_function)
     def decorator(func):
-        HANDLEdFUNCTIONS[torch_function] = func
+        HANDLED_FUNCTIONS[torch_function] = func
         return func
     return decorator
 
@@ -535,14 +535,14 @@ class QuaternionTensor(torch.Tensor):
     def __torch_function__(self, func, types, args=(), kwargs=None):
         if kwargs is None:
             kwargs = {}
-        if func not in HANDLEdFUNCTIONS or not all(
+        if func not in HANDLED_FUNCTIONS or not all(
                 issubclass(t, QuaternionTensor)
                 for t in types
         ):
             args = [a.q if isinstance(a, QuaternionTensor) else a for a in args]
             return func(*args, **kwargs)
         
-        return HANDLEdFUNCTIONS[func](*args, **kwargs)
+        return HANDLED_FUNCTIONS[func](*args, **kwargs)
 
     def torch(self):
         """
