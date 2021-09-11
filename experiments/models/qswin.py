@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.checkpoint as checkpoint
 import numpy as np
-from timm.models.layers import DropPath, Mlp, to_2tuple, trunc_normal_
+from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 
 from htorch.layers import QConv2d, QLinear
 
@@ -12,6 +12,27 @@ act = nn.GELU
 conv = nn.Conv2d
 lin = nn.Linear
 factor = 1
+
+class Mlp(nn.Module):
+    """ Multilayer perceptron."""
+
+    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.):
+        super().__init__()
+        out_features = out_features or in_features
+        hidden_features = hidden_features or in_features
+        self.fc1 = lin(in_features, hidden_features)
+        self.act = act_layer()
+        self.fc2 = lin(hidden_features, out_features)
+        self.drop = nn.Dropout(drop)
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.act(x)
+        x = self.drop(x)
+        x = self.fc2(x)
+        x = self.drop(x)
+        return x
+
 
 def set_ops(quaternion):
     global lin, conv, act, factor
@@ -360,7 +381,7 @@ class SwinTransformerBlock(nn.Module):
         self.norm2 = norm_layer(dim * factor)
         mlp_hidden_dim = int(dim * mlp_ratio)
         self.act_layer = nn.GELU
-        self.mlp = Mlp(in_features=dim * factor, hidden_features=mlp_hidden_dim * factor, act_layer=self.act_layer, drop=drop)
+        self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=self.act_layer, drop=drop)
         self.H = None
         self.W = None
 
