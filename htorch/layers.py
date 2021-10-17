@@ -516,15 +516,15 @@ class QBatchNorm2d(nn.Module):
         self.register_buffer('eye', torch.diag(torch.cat([torch.Tensor([eps])] * 4)).unsqueeze(0))
 
         if self.affine:
-            self.weight = torch.nn.Parameter(torch.zeros(4, 4, in_channels // 4))
-            self.bias = torch.nn.Parameter(torch.zeros(4, in_channels // 4))
+            self.weight = torch.nn.Parameter(torch.zeros(4, 4, in_channels))
+            self.bias = torch.nn.Parameter(torch.zeros(4, in_channels))
         else:
             self.register_parameter('weight', None)
             self.register_parameter('bias', None)
 
         if self.track_running_stats:
-            self.register_buffer('running_mean', torch.zeros(4, in_channels // 4))
-            self.register_buffer('running_cov', torch.zeros(in_channels // 4, 4, 4))
+            self.register_buffer('running_mean', torch.zeros(4, in_channels))
+            self.register_buffer('running_cov', torch.zeros(in_channels, 4, 4))
         else:
             self.register_parameter('running_mean', None)
             self.register_parameter('running_cov', None)
@@ -542,9 +542,9 @@ class QBatchNorm2d(nn.Module):
         self.reset_running_stats()
         if self.affine:
             init.constant_(self.weight[0, 0], 0.5)
-            init.constant_(self.weight[1, 1], )
-            init.constant_(self.weight[2, 2], 1)
-            init.constant_(self.weight[3, 3], 1)
+            init.constant_(self.weight[1, 1], 0.5)
+            init.constant_(self.weight[2, 2], 0.5)
+            init.constant_(self.weight[3, 3], 0.5)
 
     def forward(self, x):
         x = torch.stack(torch.chunk(x, 4, 1), 1).permute(1, 0, 2, 3, 4)
